@@ -1,11 +1,11 @@
-import k8s from '@kubernetes/client-node';
+import * as k8s from '@kubernetes/client-node';
 import { Exec } from '@kubernetes/client-node';
 import stream from 'stream';
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
 
-export const exec = new Exec();
+export const exec = new Exec(kc);
 export const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
 export const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
 
@@ -14,7 +14,8 @@ export async function execToPod(
   podName: string,
   cmd: string[],
   namespace = 'default',
-  container = 'android-x86-vm'
+  container = 'android-x86-vm',
+  fileBuffer?: Buffer
 ): Promise<{ stdout: string, stderr: string }> {
   const stdout = new stream.PassThrough();
   const stderr = new stream.PassThrough();
@@ -42,7 +43,7 @@ export async function getPodNameFromSession(sessionId: string): Promise<string> 
     fieldSelector: undefined, 
     labelSelector: `session=${sessionId}`
   });
-  const pods = res.body.items;
+  const pods = res.items;
   if (!pods.length) throw new Error(`No pod found for session ${sessionId}`);
   return pods[0].metadata?.name!;
 }

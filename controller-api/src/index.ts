@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, RequestHandler, NextFunction } from 'express';
 import { createSession } from "./sessionFactory";
 import { 
   //createSession, 
@@ -12,7 +12,15 @@ import {
   installApk,
   installApkFromUrl, 
   switchLauncher,
+  listInstalledApps,
+  uninstallApp,
+  startRecording,
+  stopRecording,
+  pullFile,
+  pushFile,
+  listDir,
 } from './podManager';
+import fs from "fs"
 import http from 'http';
 import { proxyScrcpy } from './streamProxy';
 import multer from 'multer';
@@ -27,7 +35,8 @@ const upload = multer({ dest: '/tmp' });
 
 server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url ?? '', `http://${req.headers.host}`);
-  const match = url.pathname?.match(/^\\/session\\/(.+)\\/scrcpy$/);
+  const match = url.pathname?.match(/^\/session\/(.+)\/scrcpy$/);
+  //const match = url.pathname?.match(/^\\/session\\/(.+)\\/scrcpy$/);
   if (match) {
     const sessionId = match[1];
     await proxyScrcpy(req, socket, head, sessionId);
@@ -35,6 +44,12 @@ server.on('upgrade', async (req, socket, head) => {
     socket.destroy();
   }
 });
+
+export const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>): RequestHandler =>
+    (req, res, next) =>
+        fn(req, res, next).catch(next);
+
 
 app.post('/session', async (req, res) => {
   const { sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests } = req.body;
@@ -57,7 +72,7 @@ app.get('/session/:id/status', async (req, res) => {
   }
 });
 
-app.post('/session/:id/exec', async (req, res) => {
+app.post('/session/:id/exec', asyncHandler(async (req, res) => {
   const sessionId = req.params.id;
   const { cmd } = req.body;
 
@@ -72,33 +87,33 @@ app.post('/session/:id/exec', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
-app.post('/session/:id/input/tap', async (req, res) => {
+app.post('/session/:id/input/tap', asyncHandler(async (req, res) => {
   const { x, y } = req.body;
   if (typeof x !== 'number' || typeof y !== 'number')
     return res.status(400).json({ error: 'x and y must be numbers' });
 
   const result = await tap(req.params.id, x, y);
   res.json(result);
-});
+}));
 
-app.post('/session/:id/input/swipe', async (req, res) => {
+app.post('/session/:id/input/swipe', asyncHandler(async (req, res) => {
   const { x1, y1, x2, y2 } = req.body;
   const valid = [x1, y1, x2, y2].every(n => typeof n === 'number');
   if (!valid) return res.status(400).json({ error: 'All coords must be numbers' });
 
   const result = await swipe(req.params.id, x1, y1, x2, y2);
   res.json(result);
-});
+}));
 
-app.post('/session/:id/input/key', async (req, res) => {
+app.post('/session/:id/input/key', asyncHandler(async (req, res) => {
   const { code } = req.body;
   if (typeof code !== 'number') return res.status(400).json({ error: 'Keycode must be a number' });
 
   const result = await keyevent(req.params.id, code);
   res.json(result);
-});
+}));
 
 app.get('/session/:id/screenshot', async (req, res) => {
   const pngData = await screenshot(req.params.id);
@@ -107,7 +122,7 @@ app.get('/session/:id/screenshot', async (req, res) => {
   res.send(buffer);
 });
 
-app.post('/session/:id/install', upload.single('apk'), async (req, res) => {
+app.post('/session/:id/install', upload.single('apk'), asyncHandler(async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
   const podName = status.podName;
@@ -116,8 +131,8 @@ app.post('/session/:id/install', upload.single('apk'), async (req, res) => {
     return res.status(404).json({ error: 'Session not found' });
 
   try {
-    if (req.file) {
-      const result = await installApk(sessionId, podName, req.file.path);
+    if (req.body.file) {
+      const result = await installApk(sessionId, podName, req.body.container, req.body.file.path);
       res.json(result);
     } else if (req.body.url) {
       const result = await installApkFromUrl(sessionId, req.body.url, podName);
@@ -128,25 +143,26 @@ app.post('/session/:id/install', upload.single('apk'), async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
-app.post('/session/:id/files/push', upload.single('file'), async (req, res) => {
-  const { path } = req.body;
+app.post('/session/:id/files/push', upload.single('file'), asyncHandler(async (req, res) => {
+  const { path, file, container } = req.body;
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  if (!req.file || !path) return res.status(400).json({ error: 'Missing file or path' });
+  if (!file || !path) return res.status(400).json({ error: 'Missing file or path' });
 
-  const buf = await fs.readFile(req.file.path);
-  const result = await pushFile(sessionId, status.podName, path, buf);
+  const buf = await fs.readFile(file.path, async (err, data) => {
+  const result = await pushFile(sessionId, status.podName!, container, path, data);
   res.json(result);
 });
+}));
 
 app.get('/session/:id/files/pull', async (req, res) => {
   const { path } = req.query;
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
 
-  const buf = await pullFile(sessionId, status.podName, path as string);
+  const buf = await pullFile(sessionId, status.podName!, path as string);
   res.setHeader('Content-Type', 'application/octet-stream');
   res.send(buf);
 });
@@ -156,21 +172,21 @@ app.get('/session/:id/files/list', async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
 
-  const result = await listDir(sessionId, status.podName, path as string);
+  const result = await listDir(sessionId, status.podName!, path as string);
   res.json({ output: result.stdout });
 });
 
 app.get('/session/:id/apps', async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  const result = await listInstalledApps(sessionId, status.podName);
+  const result = await listInstalledApps(sessionId, status.podName!);
   res.json(result);
 });
 
 app.delete('/session/:id/apps/:pkg', async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  const result = await uninstallApp(sessionId, status.podName, req.params.pkg);
+  const result = await uninstallApp(sessionId, status.podName!, req.params.pkg);
   res.json(result);
 });
 
@@ -178,19 +194,19 @@ app.delete('/session/:id/apps/:pkg', async (req, res) => {
 app.get('/session/:id/record/start', async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  await startRecording(sessionId, status.podName);
+  await startRecording(sessionId, status.podName!);
   res.json({ started: true });
 });
 
 app.get('/session/:id/record/stop', async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  const buffer = await stopRecording(sessionId, status.podName);
+  const buffer = await stopRecording(sessionId, status.podName!);
   res.setHeader('Content-Type', 'video/mp4');
   res.send(buffer);
 });
 
-app.post('/session/:id/launcher', async (req, res) => {
+app.post('/session/:id/launcher', asyncHandler(async (req, res) => {
   const sessionId = req.params.id;
   const { package: launcherPkg } = req.body;
 
@@ -198,12 +214,12 @@ app.post('/session/:id/launcher', async (req, res) => {
 
   try {
     const status = await getSessionStatus(sessionId);
-    const result = await switchLauncher(sessionId, status.podName, launcherPkg);
+    const result = await switchLauncher(sessionId, status.podName!, launcherPkg);
     res.json({ switched: true, output: result.stdout });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 function generateSessionId() {
   return Math.random().toString(36).substring(2, 10);

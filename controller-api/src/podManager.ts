@@ -1,8 +1,10 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { k8sApi } from './k8sClient';
+import { k8sApi, exec } from './k8sClient';
 import { coreV1 } from './k8sClient';
 import { execToPod } from './k8sClient';
+import stream from "stream"
+import { ContainerStatus } from '@kubernetes/client-node';
 
 const template = fs.readFileSync('../android-template.yaml', 'utf8');
 
@@ -34,11 +36,11 @@ export async function getSessionStatus(sessionId: string) {
     labelSelector,
   });
 
-  if (res.body.items.length === 0) {
+  if (res.items.length === 0) {
     return { exists: false, ready: false };
   }
 
-  const pod = res.body.items[0];
+  const pod = res.items[0];
   const conditions = pod.status?.conditions || [];
   const ready = conditions.some(c => c.type === 'Ready' && c.status === 'True');
 
@@ -61,7 +63,7 @@ export async function runAdbShell(sessionId: string, shellCmd: string) {
     labelSelector,
   });
   
-  const pod = res.body.items[0];
+  const pod = res.items[0];
   if (!pod?.metadata?.name) throw new Error('Pod not found');
 
   const adbCmd = ['adb', 'shell', shellCmd];
@@ -85,7 +87,7 @@ export async function screenshot(sessionId: string) {
   return result.stdout; // PNG base64 or binary (depending on handling)
 }
 
-export async function installApk(sessionId: string, podName: string, localPath: string) {
+export async function installApk(sessionId: string, podName: string, container: string, localPath: string) {
   // Copy to Android VM path
   const apkDest = `/data/local/tmp/uploaded.apk`;
 
@@ -94,12 +96,13 @@ export async function installApk(sessionId: string, podName: string, localPath: 
     `cat > ${apkDest}`
   ];
 
-  const fileBuffer = await fs.readFile(localPath);
+  const fileBuffer = await fs.readFile(localPath, async (err, data) => {
   const stdout: Buffer[] = [];
   const stderr: Buffer[] = [];
-
-  await execToPod(podName, copyCmd, 'default', fileBuffer);
-
+   if (data) {
+    await execToPod(podName, copyCmd, 'default', container, data);
+ }
+ });
   // Install the APK
   const result = await execToPod(podName, ['adb', 'install', '-r', apkDest]);
   return result;
@@ -113,19 +116,18 @@ export async function installApkFromUrl(sessionId: string, url: string, podName:
   return await execToPod(podName, cmd);
 }
 
-export async function pushFile(sessionId: string, podName: string, destPath: string, fileBuffer: Buffer) {
+export async function pushFile(sessionId: string, podName: string, container: string, destPath: string, fileBuffer: Buffer) {
   const cmd = ['sh', '-c', `cat > '${destPath}'`];
-  return await execToPod(podName, cmd, 'default', fileBuffer);
+  return await execToPod(podName, cmd, 'default', container, fileBuffer);
 }
 
 export async function pullFile(sessionId: string, podName: string, path: string): Promise<Buffer> {
   const stdout: Buffer[] = [];
-  const exec = new Exec();
-  const stream = new stream.PassThrough();
+  const streams = new stream.PassThrough();
 
-  stream.on('data', (chunk) => stdout.push(chunk));
+  streams.on('data', (chunk) => stdout.push(chunk));
 
-  await exec.exec('default', podName, 'android-vm', ['cat', path], stream, process.stderr, null, false);
+  await exec.exec('default', podName, 'android-vm', ['cat', path], streams, process.stderr, null, false);
   return Buffer.concat(stdout);
 }
 
