@@ -45,6 +45,9 @@ function generateSessionId() {
 }
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Controller API running on http://localhost:${port}`);
+//app.listen(port, () => {
+  //console.log(`Controller API running on http://localhost:${port}`);
+//});
+server.listen(port, () => {
+  console.log(`Controller API running at http://localhost:${port}`);
 });
