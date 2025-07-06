@@ -112,3 +112,55 @@ export async function installApkFromUrl(sessionId: string, url: string, podName:
   ];
   return await execToPod(podName, cmd);
 }
+
+export async function pushFile(sessionId: string, podName: string, destPath: string, fileBuffer: Buffer) {
+  const cmd = ['sh', '-c', `cat > '${destPath}'`];
+  return await execToPod(podName, cmd, 'default', fileBuffer);
+}
+
+export async function pullFile(sessionId: string, podName: string, path: string): Promise<Buffer> {
+  const stdout: Buffer[] = [];
+  const exec = new Exec();
+  const stream = new stream.PassThrough();
+
+  stream.on('data', (chunk) => stdout.push(chunk));
+
+  await exec.exec('default', podName, 'android-vm', ['cat', path], stream, process.stderr, null, false);
+  return Buffer.concat(stdout);
+}
+
+export async function listDir(sessionId: string, podName: string, path: string) {
+  const cmd = ['ls', '-l', path];
+  return await execToPod(podName, cmd);
+}
+
+export async function listInstalledApps(sessionId: string, podName: string) {
+  const result = await execToPod(podName, ['adb', 'shell', 'pm', 'list', 'packages', '-f']);
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const match = line.match(/package:(.+\\.apk)=(.+)/);
+      return match ? { apk: match[1], package: match[2] } : null;
+    })
+    .filter(Boolean);
+}
+
+export async function uninstallApp(sessionId: string, podName: string, pkg: string) {
+  return await execToPod(podName, ['adb', 'uninstall', pkg]);
+}
+
+export async function startRecording(sessionId: string, podName: string) {
+  const cmd = ['adb', 'shell', 'screenrecord', '/sdcard/record.mp4'];
+  // Detach in background using sh
+  return await execToPod(podName, ['sh', '-c', `${cmd.join(' ')} &`]);
+}
+
+export async function stopRecording(sessionId: string, podName: string): Promise<Buffer> {
+  await execToPod(podName, ['adb', 'shell', 'pkill', '-INT', 'screenrecord']);
+  await new Promise(r => setTimeout(r, 1000)); // wait for write
+
+  return await pullFile(sessionId, podName, '/sdcard/record.mp4');
+}
+
+
