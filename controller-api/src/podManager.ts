@@ -4,7 +4,7 @@ import { k8sApi } from './k8sClient';
 import { coreV1 } from './k8sClient';
 import { execToPod } from './k8sClient';
 
-const template = fs.readFileSync('./android-template.yaml', 'utf8');
+const template = fs.readFileSync('../android-template.yaml', 'utf8');
 
 export async function createSession(sessionId: string) {
   const filled = template.replace(/{{SESSION_ID}}/g, sessionId);
