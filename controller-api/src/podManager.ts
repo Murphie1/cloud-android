@@ -163,4 +163,19 @@ export async function stopRecording(sessionId: string, podName: string): Promise
   return await pullFile(sessionId, podName, '/sdcard/record.mp4');
 }
 
+export async function switchLauncher(sessionId: string, podName: string, launcherPkg: string) {
+  // Clear default launcher
+  await execToPod(podName, ['adb', 'shell', 'pm', 'clear', 'com.android.launcher3']);
 
+  // Start the new launcher
+  const cmd = [
+    'adb', 'shell',
+    'am', 'start',
+    '-a', 'android.intent.action.MAIN',
+    '-c', 'android.intent.category.HOME',
+    '-n', `${launcherPkg}/.Launcher` // fallback: just package if exact name unknown
+  ];
+
+  const result = await execToPod(podName, cmd);
+  return result;
+}
