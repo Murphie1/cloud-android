@@ -6,7 +6,7 @@ const proxy = createProxyServer({ ws: true });
 
 export async function proxyScrcpy(req: http.IncomingMessage, socket: any, head: any, sessionId: string) {
   const labelSelector = `session=${sessionId}`;
-  const pods = await coreV1.listNamespacedPod({
+  const pods = await coreV1.listNamespacedDeployment({
     namespace: 'default', 
     pretty: undefined,
     allowWatchBookmarks: undefined,
