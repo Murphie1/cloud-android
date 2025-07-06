@@ -25,7 +25,7 @@ export async function deleteSession(sessionId: string) {
 
 export async function getSessionStatus(sessionId: string) {
   const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod({
+  const res = await coreV1.listNamespacedDeployment({
     namespace: 'default', 
     pretty: undefined,
     allowWatchBookmarks: undefined,
@@ -52,7 +52,7 @@ export async function getSessionStatus(sessionId: string) {
 
 export async function runAdbShell(sessionId: string, shellCmd: string) {
   const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod({
+  const res = await coreV1.listNamespacedDeployment({
     namespace: 'default', 
     pretty: undefined,
     allowWatchBookmarks: undefined,
