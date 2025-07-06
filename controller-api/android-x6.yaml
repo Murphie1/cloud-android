@@ -1,37 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: android-vm-{{SESSION_ID}}
+  name: android-vm-{{sessionId}}
   labels:
-    app: android-vm
-    session: "{{SESSION_ID}}"
+    app: android-x86-vm
+    session: "{{sessionId}}"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: android-vm
-      session: "{{SESSION_ID}}"
+      app: android-x86-vm
+      session: "{{sessionId}}"
   template:
     metadata:
       labels:
-        app: android-vm
-        session: "{{SESSION_ID}}"
+        app: android-x86-vm
+        session: "{{sessionId}}"
     spec:
       containers:
-        - name: android-vm
+        - name: android-x86-vm
           image: murphyalbert/cookbooks:android-x86-vm-latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080  # WebSocket for scrcpy
-            - containerPort: 5555 # ADB (internal)
-            - containerPort: 5900 # VNC (internal)
+            - containerPort: 5555  # ADB (internal)
+            - containerPort: 5900  # VNC (internal)
           resources:
             requests:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: "{{cpuRequests}}"
+              memory: "{{memoryRequests}}"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: {{cpuLimits}}"
+              memory: "{{memoryLimits}}"
           volumeMounts:
             - mountPath: /data
               name: android-data
