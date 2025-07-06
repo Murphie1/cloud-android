@@ -46,3 +46,21 @@ export async function runAdbShell(sessionId: string, shellCmd: string) {
   const adbCmd = ['adb', 'shell', shellCmd];
   return await execToPod(pod.metadata.name, adbCmd);
 }
+
+export async function tap(sessionId: string, x: number, y: number) {
+  return await runAdbShell(sessionId, `input tap ${x} ${y}`);
+}
+
+export async function swipe(sessionId: string, x1: number, y1: number, x2: number, y2: number) {
+  return await runAdbShell(sessionId, `input swipe ${x1} ${y1} ${x2} ${y2}`);
+}
+
+export async function keyevent(sessionId: string, code: number) {
+  return await runAdbShell(sessionId, `input keyevent ${code}`);
+}
+
+export async function screenshot(sessionId: string) {
+  const result = await runAdbShell(sessionId, `screencap -p`);
+  return result.stdout; // PNG base64 or binary (depending on handling)
+}
+
