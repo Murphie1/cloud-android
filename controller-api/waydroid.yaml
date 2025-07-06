@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: waydroid-controller-{{sessionId}}
+  labels:
+    app: waydroid
+    session: "{{sessionId}}"
+spec:
+  hostNetwork: true
+  hostPID: true
+  containers:
+    - name: waydroid-api
+      image: murphyalbert/cookbooks:waydroid-controller-latest
+      securityContext:
+        privileged: true
+      env:
+        - name: SESSION_ID
+          value: "{{sessionId}}"
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+  volumes:
+    - name: host-root
+      hostPath:
+        path: /
