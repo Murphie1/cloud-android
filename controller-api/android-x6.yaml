@@ -21,6 +21,9 @@ spec:
         - name: android-x86-vm
           image: murphyalbert/cookbooks:android-x86-vm-latest
           imagePullPolicy: Always
+          env:
+            - name: DISPLAY_RESOLUTION
+            value: "{{resolution}}"
           ports:
             - containerPort: 8080  # WebSocket for scrcpy
             - containerPort: 5555  # ADB (internal)
