@@ -64,3 +64,30 @@ export async function screenshot(sessionId: string) {
   return result.stdout; // PNG base64 or binary (depending on handling)
 }
 
+export async function installApk(sessionId: string, podName: string, localPath: string) {
+  // Copy to Android VM path
+  const apkDest = `/data/local/tmp/uploaded.apk`;
+
+  const copyCmd = [
+    'sh', '-c',
+    `cat > ${apkDest}`
+  ];
+
+  const fileBuffer = await fs.readFile(localPath);
+  const stdout: Buffer[] = [];
+  const stderr: Buffer[] = [];
+
+  await execToPod(podName, copyCmd, 'default', fileBuffer);
+
+  // Install the APK
+  const result = await execToPod(podName, ['adb', 'install', '-r', apkDest]);
+  return result;
+}
+
+export async function installApkFromUrl(sessionId: string, url: string, podName: string) {
+  const cmd = [
+    'sh', '-c',
+    `wget -O /data/local/tmp/remote.apk '${url}' && adb install -r /data/local/tmp/remote.apk`
+  ];
+  return await execToPod(podName, cmd);
+}
