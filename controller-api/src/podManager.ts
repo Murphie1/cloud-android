@@ -2,6 +2,7 @@ import fs from 'fs';
 import YAML from 'yaml';
 import { k8sApi } from './k8sClient';
 import { coreV1 } from './k8sClient';
+import { execToPod } from './k8sClient';
 
 const template = fs.readFileSync('./android-template.yaml', 'utf8');
 
@@ -34,4 +35,14 @@ export async function getSessionStatus(sessionId: string) {
     phase: pod.status?.phase,
     ready
   };
+}
+
+export async function runAdbShell(sessionId: string, shellCmd: string) {
+  const labelSelector = `session=${sessionId}`;
+  const res = await coreV1.listNamespacedPod('default', undefined, undefined, undefined, undefined, labelSelector);
+  const pod = res.body.items[0];
+  if (!pod?.metadata?.name) throw new Error('Pod not found');
+
+  const adbCmd = ['adb', 'shell', shellCmd];
+  return await execToPod(pod.metadata.name, adbCmd);
 }
