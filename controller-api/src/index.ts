@@ -1,8 +1,23 @@
 import express from 'express';
 import { createSession, deleteSession, getSessionStatus } from './podManager';
+import http from 'http';
+import { proxyScrcpy } from './streamProxy';
 
 const app = express();
 app.use(express.json());
+
+const server = http.createServer(app);
+
+server.on('upgrade', async (req, socket, head) => {
+  const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+  const match = url.pathname?.match(/^\\/session\\/(.+)\\/scrcpy$/);
+  if (match) {
+    const sessionId = match[1];
+    await proxyScrcpy(req, socket, head, sessionId);
+  } else {
+    socket.destroy();
+  }
+});
 
 app.post('/session', async (req, res) => {
   const sessionId = generateSessionId();
