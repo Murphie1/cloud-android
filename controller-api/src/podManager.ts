@@ -10,16 +10,29 @@ export async function createSession(sessionId: string) {
   const filled = template.replace(/{{SESSION_ID}}/g, sessionId);
   const deployment = YAML.parse(filled);
 
-  await k8sApi.createNamespacedDeployment('default', deployment);
+  await k8sApi.createNamespacedDeployment({
+    namespace: 'default', 
+    body: deployment
+  });
 }
 
 export async function deleteSession(sessionId: string) {
-  await k8sApi.deleteNamespacedDeployment(`android-vm-${sessionId}`, 'default');
+  await k8sApi.deleteNamespacedDeployment({
+    name: `android-vm-${sessionId}`,
+    namespace: 'default'
+  });
 }
 
 export async function getSessionStatus(sessionId: string) {
   const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod('default', undefined, undefined, undefined, undefined, labelSelector);
+  const res = await coreV1.listNamespacedPod({
+    namespace: 'default', 
+    pretty: undefined,
+    allowWatchBookmarks: undefined,
+    _continue: undefined,
+    fieldSelector: undefined,
+    labelSelector,
+  });
 
   if (res.body.items.length === 0) {
     return { exists: false, ready: false };
@@ -39,7 +52,15 @@ export async function getSessionStatus(sessionId: string) {
 
 export async function runAdbShell(sessionId: string, shellCmd: string) {
   const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod('default', undefined, undefined, undefined, undefined, labelSelector);
+  const res = await coreV1.listNamespacedPod({
+    namespace: 'default', 
+    pretty: undefined,
+    allowWatchBookmarks: undefined,
+    _continue: undefined,
+    fieldSelector: undefined,
+    labelSelector,
+  });
+  
   const pod = res.body.items[0];
   if (!pod?.metadata?.name) throw new Error('Pod not found');
 
