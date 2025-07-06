@@ -1,5 +1,5 @@
 import express from 'express';
-import { createSession, deleteSession } from './podManager';
+import { createSession, deleteSession, getSessionStatus } from './podManager';
 
 const app = express();
 app.use(express.json());
@@ -13,6 +13,16 @@ app.post('/session', async (req, res) => {
 app.delete('/session/:id', async (req, res) => {
   await deleteSession(req.params.id);
   res.sendStatus(204);
+});
+
+app.get('/session/:id/status', async (req, res) => {
+  try {
+    const status = await getSessionStatus(req.params.id);
+    res.json(status);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch session status' });
+  }
 });
 
 function generateSessionId() {
