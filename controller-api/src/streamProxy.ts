@@ -6,7 +6,14 @@ const proxy = createProxyServer({ ws: true });
 
 export async function proxyScrcpy(req: http.IncomingMessage, socket: any, head: any, sessionId: string) {
   const labelSelector = `session=${sessionId}`;
-  const pods = await coreV1.listNamespacedPod('default', undefined, undefined, undefined, undefined, labelSelector);
+  const pods = await coreV1.listNamespacedPod({
+    namespace: 'default', 
+    pretty: undefined,
+    allowWatchBookmarks: undefined,
+    _continue: undefined,
+    fieldSelector: undefined,
+    labelSelector,
+  });
   const pod = pods.body.items[0];
   if (!pod) return socket.destroy();
 
