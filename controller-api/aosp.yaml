@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aosp-vm-{{sessionId}}
+  labels:
+    app: aosp-vm
+    session: "{{sessionId}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aosp-vm
+      session: "{{sessionId}}"
+  template:
+    metadata:
+      labels:
+        app: aosp-vm
+        session: "{{sessionId}}"
+    spec:
+      containers:
+        - name: aosp-vm
+          image: murphyalbert/cookbooks:aosp-custom-latest
+          ports:
+            - containerPort: 8080
+            - containerPort: 5555
+            - containerPort: 5900
+          volumeMounts:
+            - mountPath: /data
+              name: aosp-data
+      volumes:
+        - name: aosp-data
+          emptyDir: {}
