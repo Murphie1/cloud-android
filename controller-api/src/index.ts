@@ -1,6 +1,7 @@
 import express from 'express';
+import { createSession } from "./sessionFactory";
 import { 
-  createSession, 
+  //createSession, 
   deleteSession, 
   getSessionStatus,
   runAdbShell,
@@ -36,8 +37,8 @@ server.on('upgrade', async (req, socket, head) => {
 });
 
 app.post('/session', async (req, res) => {
-  const sessionId = generateSessionId();
-  await createSession(sessionId);
+  const { sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests } = req.body;
+  await createSession(sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests);
   res.json({ sessionId });
 });
 
