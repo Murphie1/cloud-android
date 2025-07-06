@@ -4,6 +4,10 @@ import {
   deleteSession, 
   getSessionStatus,
   runAdbShell,
+  tap, 
+  swipe, 
+  keyevent,
+  screenshot,
 } from './podManager';
 import http from 'http';
 import { proxyScrcpy } from './streamProxy';
@@ -61,6 +65,40 @@ app.post('/session/:id/exec', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.post('/session/:id/input/tap', async (req, res) => {
+  const { x, y } = req.body;
+  if (typeof x !== 'number' || typeof y !== 'number')
+    return res.status(400).json({ error: 'x and y must be numbers' });
+
+  const result = await tap(req.params.id, x, y);
+  res.json(result);
+});
+
+app.post('/session/:id/input/swipe', async (req, res) => {
+  const { x1, y1, x2, y2 } = req.body;
+  const valid = [x1, y1, x2, y2].every(n => typeof n === 'number');
+  if (!valid) return res.status(400).json({ error: 'All coords must be numbers' });
+
+  const result = await swipe(req.params.id, x1, y1, x2, y2);
+  res.json(result);
+});
+
+app.post('/session/:id/input/key', async (req, res) => {
+  const { code } = req.body;
+  if (typeof code !== 'number') return res.status(400).json({ error: 'Keycode must be a number' });
+
+  const result = await keyevent(req.params.id, code);
+  res.json(result);
+});
+
+app.get('/session/:id/screenshot', async (req, res) => {
+  const pngData = await screenshot(req.params.id);
+  const buffer = Buffer.from(pngData, 'binary');
+  res.set('Content-Type', 'image/png');
+  res.send(buffer);
+});
+
 
 function generateSessionId() {
   return Math.random().toString(36).substring(2, 10);
