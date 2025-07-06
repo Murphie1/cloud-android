@@ -38,7 +38,7 @@ server.on('upgrade', async (req, socket, head) => {
 
 app.post('/session', async (req, res) => {
   const { sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests } = req.body;
-  await createSession(sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests);
+  await createSession(sessionId, os, resolution, memoryLimits, memoryRequests, cpuLimits, cpuRequests);
   res.json({ sessionId });
 });
 
