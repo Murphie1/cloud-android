@@ -128,7 +128,65 @@ app.post('/session/:id/install', upload.single('apk'), async (req, res) => {
   }
 });
 
+app.post('/session/:id/files/push', upload.single('file'), async (req, res) => {
+  const { path } = req.body;
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  if (!req.file || !path) return res.status(400).json({ error: 'Missing file or path' });
 
+  const buf = await fs.readFile(req.file.path);
+  const result = await pushFile(sessionId, status.podName, path, buf);
+  res.json(result);
+});
+
+app.get('/session/:id/files/pull', async (req, res) => {
+  const { path } = req.query;
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+
+  const buf = await pullFile(sessionId, status.podName, path as string);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.send(buf);
+});
+
+app.get('/session/:id/files/list', async (req, res) => {
+  const { path } = req.query;
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+
+  const result = await listDir(sessionId, status.podName, path as string);
+  res.json({ output: result.stdout });
+});
+
+app.get('/session/:id/apps', async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  const result = await listInstalledApps(sessionId, status.podName);
+  res.json(result);
+});
+
+app.delete('/session/:id/apps/:pkg', async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  const result = await uninstallApp(sessionId, status.podName, req.params.pkg);
+  res.json(result);
+});
+
+
+app.get('/session/:id/record/start', async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  await startRecording(sessionId, status.podName);
+  res.json({ started: true });
+});
+
+app.get('/session/:id/record/stop', async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  const buffer = await stopRecording(sessionId, status.podName);
+  res.setHeader('Content-Type', 'video/mp4');
+  res.send(buffer);
+});
 
 function generateSessionId() {
   return Math.random().toString(36).substring(2, 10);
