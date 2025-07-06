@@ -33,7 +33,7 @@ spec:
               cpu: "{{cpuRequests}}"
               memory: "{{memoryRequests}}"
             limits:
-              cpu: {{cpuLimits}}"
+              cpu: "{{cpuLimits}}"
               memory: "{{memoryLimits}}"
           volumeMounts:
             - mountPath: /data
