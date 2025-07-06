@@ -8,14 +8,20 @@ import {
   swipe, 
   keyevent,
   screenshot,
+  installApk,
+  installApkFromUrl, 
 } from './podManager';
 import http from 'http';
 import { proxyScrcpy } from './streamProxy';
+import multer from 'multer';
+
+
 
 const app = express();
 app.use(express.json());
 
 const server = http.createServer(app);
+const upload = multer({ dest: '/tmp' });
 
 server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url ?? '', `http://${req.headers.host}`);
@@ -98,6 +104,30 @@ app.get('/session/:id/screenshot', async (req, res) => {
   res.set('Content-Type', 'image/png');
   res.send(buffer);
 });
+
+app.post('/session/:id/install', upload.single('apk'), async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+  const podName = status.podName;
+
+  if (!status.exists || !podName)
+    return res.status(404).json({ error: 'Session not found' });
+
+  try {
+    if (req.file) {
+      const result = await installApk(sessionId, podName, req.file.path);
+      res.json(result);
+    } else if (req.body.url) {
+      const result = await installApkFromUrl(sessionId, req.body.url, podName);
+      res.json(result);
+    } else {
+      res.status(400).json({ error: 'No file or URL provided' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 function generateSessionId() {
