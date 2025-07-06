@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: android-vm-{{sessionId}}
+  labels:
+    app: bliss-vm
+    session: "{{sessionId}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bliss-vm
+      session: "{{sessionId}}"
+  template:
+    metadata:
+      labels:
+        app: bliss-vm
+        session: "{{sessionId}}"
+    spec:
+      containers:
+        - name: bliss-vm
+          image: murphyalbert/cookbooks:bliss-vm-latest
+          imagePullPolicy: Always
+          env:
+            - name: DISPLAY_RESOLUTION
+            value: "{{resolution}}"
+          ports:
+            - containerPort: 8080  # WebSocket for scrcpy
+            - containerPort: 5555  # ADB (internal)
+            - containerPort: 5900  # VNC (internal)
+          resources:
+            requests:
+              cpu: "{{cpuRequests}}"
+              memory: "{{memoryRequests}}"
+            limits:
+              cpu: "{{cpuLimits}}"
+              memory: "{{memoryLimits}}"
+          volumeMounts:
+            - mountPath: /data
+              name: android-data
+      volumes:
+        - name: android-data
+          emptyDir: {}
+      restartPolicy: Always
