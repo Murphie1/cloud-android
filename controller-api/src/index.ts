@@ -1,5 +1,10 @@
 import express from 'express';
-import { createSession, deleteSession, getSessionStatus } from './podManager';
+import { 
+  createSession, 
+  deleteSession, 
+  getSessionStatus,
+  runAdbShell,
+} from './podManager';
 import http from 'http';
 import { proxyScrcpy } from './streamProxy';
 
@@ -37,6 +42,23 @@ app.get('/session/:id/status', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch session status' });
+  }
+});
+
+app.post('/session/:id/exec', async (req, res) => {
+  const sessionId = req.params.id;
+  const { cmd } = req.body;
+
+  if (!cmd || typeof cmd !== 'string') {
+    return res.status(400).json({ error: 'Missing "cmd" in request body' });
+  }
+
+  try {
+    const result = await runAdbShell(sessionId, cmd);
+    res.json(result);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
