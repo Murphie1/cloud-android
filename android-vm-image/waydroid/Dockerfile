@@ -1,11 +1,16 @@
 FROM ubuntu:22.04
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt update && apt install -y \
-  waydroid \
-  adb \
-  socat \
-  curl \
-  supervisor
+    adb \
+    curl \
+    supervisor \
+    socat \
+    net-tools \
+    iputils-ping \
+    scrcpy \
+    && apt clean
 
 COPY start.sh /start.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
