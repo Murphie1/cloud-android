@@ -10,6 +10,7 @@ import {
   screenshot,
   installApk,
   installApkFromUrl, 
+  switchLauncher,
 } from './podManager';
 import http from 'http';
 import { proxyScrcpy } from './streamProxy';
