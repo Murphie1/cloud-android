@@ -188,6 +188,21 @@ app.get('/session/:id/record/stop', async (req, res) => {
   res.send(buffer);
 });
 
+app.post('/session/:id/launcher', async (req, res) => {
+  const sessionId = req.params.id;
+  const { package: launcherPkg } = req.body;
+
+  if (!launcherPkg) return res.status(400).json({ error: "Missing launcher package name" });
+
+  try {
+    const status = await getSessionStatus(sessionId);
+    const result = await switchLauncher(sessionId, status.podName, launcherPkg);
+    res.json({ switched: true, output: result.stdout });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function generateSessionId() {
   return Math.random().toString(36).substring(2, 10);
 }
