@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies (QEMU, Android tools, scrcpy deps, etc.)
+# Install dependencies
 RUN apt-get update && apt-get install -y \
   qemu-system-x86 \
   android-sdk-platform-tools \
@@ -33,13 +33,12 @@ RUN apt-get update && apt-get install -y \
   adb \
   && apt-get clean
 
-# Set JAVA_HOME for Java 17
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="$JAVA_HOME/bin:$PATH"
-
 # Clone and build scrcpy
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     cd /opt/scrcpy && \
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
+    echo "Detected JAVA_HOME=$JAVA_HOME" && \
+    $JAVA_HOME/bin/java -version && \
     ./gradlew assembleDebug && \
     meson setup build --buildtype release && \
     ninja -C build && \
@@ -52,13 +51,12 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 RUN mkdir -p /android && \
     wget -O /android/android-x86.iso https://osdn.net/projects/android-x86/downloads/77982/android-x86_64-9.0-r2.iso/
 
-# Copy startup script and supervisor config
+# Add entrypoint and config
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Expose ADB and VNC ports
+# Expose ports
 EXPOSE 5555 5900
 
-# Start supervisor on container boot
 CMD ["/usr/bin/supervisord"]
