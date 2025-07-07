@@ -1,8 +1,9 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
-# Install QEMU, ADB, VNC server and dependencies
+# Install essential packages and tools
 RUN apt-get update && apt-get install -y \
   qemu-system-x86 \
   android-sdk-platform-tools \
@@ -13,37 +14,35 @@ RUN apt-get update && apt-get install -y \
   x11vnc \
   net-tools \
   supervisor \
-  && apt-get clean
-
-  # Add this after ADB install in Dockerfile
-RUN apt-get update && apt-get install -y \
   ffmpeg \
   meson \
+  cmake \
   ninja-build \
-  libsdl2-dev \
+  pkg-config \
+  git \
+  build-essential \
   libavcodec-dev \
   libavformat-dev \
   libavutil-dev \
-  pkg-config \
-  git \
+  libavdevice-dev \
+  libswscale-dev \
+  libavfilter-dev \
+  libusb-1.0-0-dev \
+  libsdl2-dev \
+  openjdk-11-jdk \
+  gradle \
+  adb \
   && apt-get clean
 
-# Install dependencies
-RUN apt update && apt install -y \
-  build-essential meson cmake ninja-build pkg-config \
-  libavdevice-dev \
-  libswscale-dev libavfilter-dev libusb-1.0-0-dev \
-  libsdl2-dev openjdk-11-jdk \
-  adb wget unzip \
-  && apt clean
-
-# Clone and build scrcpy
+# Clone and build scrcpy (includes native binary + Android server)
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     cd /opt/scrcpy && \
+    ./gradlew assembleDebug && \
     meson setup build --buildtype release && \
     ninja -C build && \
     ninja -C build install
 
+# Clone ws-scrcpy
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Download Android-x86 ISO
