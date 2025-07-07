@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all system dependencies with required X11 libraries
+# Install all system dependencies
 RUN apt-get update && apt-get install -y \
   wget unzip curl git \
   build-essential ninja-build meson cmake pkg-config \
@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
   qemu-system-x86 net-tools supervisor ffmpeg \
   openjdk-17-jdk \
   adb \
-  # Add missing X11 development libraries
   libxcursor-dev \
   libxinerama-dev \
   libxrandr-dev \
@@ -20,10 +19,8 @@ RUN apt-get update && apt-get install -y \
   && apt-get clean
 
 # -------------------------
-# Android SDK Setup
+# Android SDK Setup (simplified)
 # -------------------------
-
-# Install command line tools
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     cd /opt/android-sdk && \
     wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip && \
@@ -31,32 +28,34 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     mv cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest && \
     rm cmdline-tools.zip
 
-# Set Android SDK environment variables
 ENV ANDROID_HOME=/opt/android-sdk
-ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
-# Accept licenses and install required SDK packages
+# Only install essential packages (remove build-tools)
 RUN yes | sdkmanager --licenses && \
-    sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "platforms;android-35"
-
-# Fix aidl script syntax error (line 6 unterminated string)
-# Replace the problematic aidl script with a fixed version
-RUN sed -i '6s|.*|    --pretty \\|' /opt/android-sdk/build-tools/34.0.0/aidl
+    sdkmanager "platform-tools"
 
 # -------------------------
-# scrcpy build
+# scrcpy build (fixed using official method)
 # -------------------------
+ARG SCRCPY_VER=3.3.1
+ARG SERVER_HASH="a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8"
 
-# Clone and build scrcpy with fixed JAVA_HOME
+# Download prebuilt server binary
+RUN curl -L -o /scrcpy-server \
+    https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VER}/scrcpy-server-v${SCRCPY_VER} && \
+    echo "${SERVER_HASH}  /scrcpy-server" | sha256sum -c -
+
+# Build client only with prebuilt server
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
-    echo "sdk.dir=$ANDROID_HOME" > /opt/scrcpy/local.properties && \
     cd /opt/scrcpy && \
-    # Explicitly set JAVA_HOME to OpenJDK 17 location
-    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
-    ./gradlew assembleDebug && \
-    meson setup build --buildtype release && \
-    ninja -C build && \
-    ninja -C build install
+    meson setup build \
+        --buildtype release \
+        --strip \
+        -Db_lto=true \
+        -Dprebuilt_server=/scrcpy-server && \
+    meson compile -C build && \
+    meson install -C build
 
 # -------------------------
 # ws-scrcpy (WebSocket wrapper)
@@ -77,7 +76,5 @@ RUN chmod +x /start.sh
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Expose ADB and VNC
 EXPOSE 5555 5900
-
 CMD ["/usr/bin/supervisord"]
