@@ -48,7 +48,7 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     echo "sdk.dir=$ANDROID_HOME" > /opt/scrcpy/local.properties && \
     cd /opt/scrcpy && \
     # Explicitly set JAVA_HOME to OpenJDK 17 location
-    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 && \
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
     ./gradlew assembleDebug && \
     meson setup build --buildtype release && \
     ninja -C build && \
