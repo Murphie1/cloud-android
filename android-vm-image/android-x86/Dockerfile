@@ -28,14 +28,21 @@ RUN apt-get update && apt-get install -y \
   git \
   && apt-get clean
 
-# Clone and build scrcpy + ws-scrcpy
+# Install dependencies
+RUN apt update && apt install -y \
+  build-essential meson cmake ninja-build pkg-config \
+  libavdevice-dev \
+  libswscale-dev libavfilter-dev libusb-1.0-0-dev \
+  libsdl2-dev openjdk-11-jdk \
+  adb wget unzip \
+  && apt clean
+
+# Clone and build scrcpy
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     cd /opt/scrcpy && \
     meson setup build --buildtype release && \
     ninja -C build && \
     ninja -C build install
-
-RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Download Android-x86 ISO
 RUN mkdir -p /android && \
