@@ -4,20 +4,41 @@ import { coreV1 } from './k8sClient';
 
 const proxy = createProxyServer({ ws: true });
 
-export async function proxyScrcpy(req: http.IncomingMessage, socket: any, head: any, sessionId: string) {
-  const labelSelector = `session=${sessionId}`;
-  const pods = await coreV1.listNamespacedPod({
-    namespace: 'default', 
-    pretty: undefined,
-    allowWatchBookmarks: undefined,
-    _continue: undefined,
-    fieldSelector: undefined,
-    labelSelector,
-  });
-  const pod = pods.items[0];
-  if (!pod) return socket.destroy();
+// ✅ Attach error handler once
+proxy.on('error', (err, _req, _res, _target) => {
+  console.error(`❌ Proxy error: ${err.message}`);
+});
 
-  const ip = pod.status?.podIP;
-  const target = `ws://${ip}:8080`;
-  proxy.ws(req, socket, head, { target });
+export async function proxyScrcpy(
+  req: http.IncomingMessage,
+  socket: any,
+  head: any,
+  sessionId: string
+) {
+  const labelSelector = `session=${sessionId}`;
+
+  try {
+    const res = await coreV1.listNamespacedPod({
+      namespace: 'default',
+      labelSelector
+    });
+
+    // ✅ Only pick Running pod with valid IP
+    const pod = res.items.find(p => p.status?.phase === 'Running' && p.status?.podIP);
+
+    if (!pod || !pod.status?.podIP) {
+      console.warn(`❌ No running pod found for session ${sessionId}`);
+      return socket.destroy();
+    }
+
+    const ip = pod.status.podIP;
+    const target = `ws://${ip}:8080`;
+
+    console.log(`🔁 Proxying scrcpy for session ${sessionId} to ${target}`);
+    proxy.ws(req, socket, head, { target });
+
+  } catch (err: any) {
+    console.error(`❌ Failed to proxy scrcpy: ${err.message}`);
+    socket.destroy();
+  }
 }
