@@ -29,10 +29,6 @@ export async function getSessionStatus(sessionId: string) {
   const labelSelector = `session=${sessionId}`;
   const res = await coreV1.listNamespacedPod({
     namespace: 'default', 
-    pretty: undefined,
-    allowWatchBookmarks: undefined,
-    _continue: undefined,
-    fieldSelector: undefined,
     labelSelector,
   });
 
@@ -40,7 +36,9 @@ export async function getSessionStatus(sessionId: string) {
     return { exists: false, ready: false };
   }
 
-  const pod = res.items[0];
+  // ✅ FIX: Choose a running pod if multiple exist (e.g., during restarts)
+  const pod = res.items.find(p => p.status?.phase === 'Running') || res.items[0];
+
   const conditions = pod.status?.conditions || [];
   const ready = conditions.some(c => c.type === 'Ready' && c.status === 'True');
 
@@ -88,23 +86,17 @@ export async function screenshot(sessionId: string) {
 }
 
 export async function installApk(sessionId: string, podName: string, container: string, localPath: string) {
-  // Copy to Android VM path
   const apkDest = `/data/local/tmp/uploaded.apk`;
+  const copyCmd = ['sh', '-c', `cat > ${apkDest}`];
 
-  const copyCmd = [
-    'sh', '-c',
-    `cat > ${apkDest}`
-  ];
+  // ✅ FIX: Use fs.promises.readFile instead of incorrect callback+await usage
+  const fileBuffer = await fs.promises.readFile(localPath);
 
-  const fileBuffer = await fs.readFile(localPath, async (err, data) => {
-  const stdout: Buffer[] = [];
-  const stderr: Buffer[] = [];
-   if (data) {
-    await execToPod(podName, copyCmd, 'default', container, data);
- }
- });
-  // Install the APK
-  const result = await execToPod(podName, ['adb', 'install', '-r', apkDest]);
+  // ✅ FIX: Ensure namespace and container are passed
+  await execToPod(podName, copyCmd, 'default', container, fileBuffer);
+
+  // ✅ FIX: Ensure consistent usage of execToPod with namespace and container
+  const result = await execToPod(podName, ['adb', 'install', '-r', apkDest], 'default', container);
   return result;
 }
 
@@ -127,7 +119,12 @@ export async function pullFile(sessionId: string, podName: string, path: string)
 
   streams.on('data', (chunk) => stdout.push(chunk));
 
-  await exec.exec('default', podName, 'android-vm', ['cat', path], streams, process.stderr, null, false);
+  // ✅ FIX: Dynamically retrieve container name instead of hardcoding 'android-vm'
+  const pod = await coreV1.readNamespacedPod(podName, 'default');
+  const containerName = pod.body.spec?.containers?.[0]?.name || 'android-vm';
+
+  await exec.exec('default', podName, containerName, ['cat', path], streams, process.stderr, null, false);
+
   return Buffer.concat(stdout);
 }
 
@@ -138,11 +135,13 @@ export async function listDir(sessionId: string, podName: string, path: string) 
 
 export async function listInstalledApps(sessionId: string, podName: string) {
   const result = await execToPod(podName, ['adb', 'shell', 'pm', 'list', 'packages', '-f']);
+
   return result.stdout
     .split('\n')
     .filter(Boolean)
     .map(line => {
-      const match = line.match(/package:(.+\\.apk)=(.+)/);
+      // ✅ FIX: More robust regex to handle paths with special chars
+      const match = line.match(/^package:(.*?)=(.+)$/);
       return match ? { apk: match[1], package: match[2] } : null;
     })
     .filter(Boolean);
