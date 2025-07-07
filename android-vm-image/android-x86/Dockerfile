@@ -1,9 +1,8 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
-# Install essential packages and tools
+# Install dependencies (Java, Gradle, build tools, media libs, VNC, QEMU, ADB, etc.)
 RUN apt-get update && apt-get install -y \
   qemu-system-x86 \
   android-sdk-platform-tools \
@@ -34,7 +33,12 @@ RUN apt-get update && apt-get install -y \
   adb \
   && apt-get clean
 
-# Clone and build scrcpy (includes native binary + Android server)
+# Set JAVA_HOME dynamically
+RUN echo "export JAVA_HOME=$(readlink -f /usr/bin/java | sed 's:bin/java::')" >> /etc/profile && \
+    echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> /etc/profile && \
+    export JAVA_HOME=$(readlink -f /usr/bin/java | sed 's:bin/java::')
+
+# Clone and build scrcpy
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     cd /opt/scrcpy && \
     ./gradlew assembleDebug && \
@@ -42,20 +46,22 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     ninja -C build && \
     ninja -C build install
 
-# Clone ws-scrcpy
+# Clone ws-scrcpy (websocket wrapper)
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Download Android-x86 ISO
 RUN mkdir -p /android && \
     wget -O /android/android-x86.iso https://osdn.net/projects/android-x86/downloads/77982/android-x86_64-9.0-r2.iso/
 
-# Add entrypoint script
+# Copy entrypoint script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Supervisor config for running QEMU and VNC
+# Copy supervisord config
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Expose ADB and VNC ports
 EXPOSE 5555 5900
 
+# Start supervisor
 CMD ["/usr/bin/supervisord"]
