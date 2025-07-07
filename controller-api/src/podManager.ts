@@ -180,3 +180,12 @@ export async function switchLauncher(sessionId: string, podName: string, launche
   const result = await execToPod(podName, cmd);
   return result;
 }
+
+// 🆕 Optional Helper: Reusable pod name fetcher
+async function getPodNameForSession(sessionId: string): Promise<string> {
+  const labelSelector = `session=${sessionId}`;
+  const res = await coreV1.listNamespacedPod({ namespace: 'default', labelSelector });
+  const pod = res.items.find(p => p.status?.phase === 'Running') || res.items[0];
+  if (!pod?.metadata?.name) throw new Error('Pod not found for session');
+  return pod.metadata.name;
+}
