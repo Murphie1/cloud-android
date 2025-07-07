@@ -38,7 +38,7 @@ RUN yes | sdkmanager --licenses && \
 
 # Use scrcpy prebuilt server like x86 version
 ARG SCRCPY_VER=3.3.1
-ARG SERVER_HASH="..."
+ARG SERVER_HASH="a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8"
 
 RUN curl -L -o /scrcpy-server https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VER}/scrcpy-server-v${SCRCPY_VER} && \
     echo "${SERVER_HASH}  /scrcpy-server" | sha256sum -c -
