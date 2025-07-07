@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all system dependencies
+# Install all system dependencies with required X11 libraries
 RUN apt-get update && apt-get install -y \
   wget unzip curl git \
   build-essential ninja-build meson cmake pkg-config \
@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y \
   qemu-system-x86 net-tools supervisor ffmpeg \
   openjdk-17-jdk \
   adb \
+  # Add missing X11 development libraries
+  libxcursor-dev \
+  libxinerama-dev \
+  libxrandr-dev \
+  libxi-dev \
   && apt-get clean
 
 # -------------------------
@@ -30,19 +35,20 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
 
-# Accept licenses and install required SDK packages
+# Accept licenses and install required SDK packages (updated to 34.0.0)
 RUN yes | sdkmanager --licenses && \
-    sdkmanager "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+    sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
 
 # -------------------------
 # scrcpy build
 # -------------------------
 
-# Clone and build scrcpy
+# Clone and build scrcpy with fixed JAVA_HOME
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     echo "sdk.dir=$ANDROID_HOME" > /opt/scrcpy/local.properties && \
     cd /opt/scrcpy && \
-    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
+    # Explicitly set JAVA_HOME to OpenJDK 17 location
+    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 && \
     ./gradlew assembleDebug && \
     meson setup build --buildtype release && \
     ninja -C build && \
