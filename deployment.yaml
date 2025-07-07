@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-android-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-android-api
+  template:
+    metadata:
+      labels:
+        app: cloud-android-api
+    spec:
+      containers:
+        - name: cloud-android-api
+          image: murphyalbert/cookbooks: cloud-android-api-latest
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /root/.kube
+            - name: session-storage
+              mountPath: /app/sessions
+      volumes:
+        - name: kubeconfig
+          hostPath:
+            path: /root/.kube
+        - name: session-storage
+          hostPath:
+            path: /var/cloud-android-api/sessions  # or any directory on your VM
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-android-api
+spec:
+  type: NodePort
+  selector:
+    app: cloud-android-api
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30060
