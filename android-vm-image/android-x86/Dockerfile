@@ -2,61 +2,72 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
+# Install all system dependencies
 RUN apt-get update && apt-get install -y \
-  qemu-system-x86 \
-  android-sdk-platform-tools \
-  wget \
-  unzip \
-  tigervnc-standalone-server \
-  xfce4 \
-  x11vnc \
-  net-tools \
-  supervisor \
-  ffmpeg \
-  meson \
-  cmake \
-  ninja-build \
-  pkg-config \
-  git \
-  build-essential \
-  libavcodec-dev \
-  libavformat-dev \
-  libavutil-dev \
-  libavdevice-dev \
-  libswscale-dev \
-  libavfilter-dev \
-  libusb-1.0-0-dev \
-  libsdl2-dev \
+  wget unzip curl git \
+  build-essential ninja-build meson cmake pkg-config \
+  libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev \
+  libusb-1.0-0-dev libsdl2-dev \
+  tigervnc-standalone-server xfce4 x11vnc \
+  qemu-system-x86 net-tools supervisor ffmpeg \
   openjdk-17-jdk \
-  gradle \
   adb \
   && apt-get clean
 
+# -------------------------
+# Android SDK Setup
+# -------------------------
+
+# Install command line tools
+RUN mkdir -p /opt/android-sdk/cmdline-tools && \
+    cd /opt/android-sdk && \
+    wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip && \
+    unzip cmdline-tools.zip -d cmdline-tools && \
+    mv cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest && \
+    rm cmdline-tools.zip
+
+# Set Android SDK environment variables
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
+
+# Accept licenses and install required SDK packages
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+
+# -------------------------
+# scrcpy build
+# -------------------------
+
 # Clone and build scrcpy
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
+    echo "sdk.dir=$ANDROID_HOME" > /opt/scrcpy/local.properties && \
     cd /opt/scrcpy && \
     export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
-    echo "Detected JAVA_HOME=$JAVA_HOME" && \
-    $JAVA_HOME/bin/java -version && \
     ./gradlew assembleDebug && \
     meson setup build --buildtype release && \
     ninja -C build && \
     ninja -C build install
 
-# Clone ws-scrcpy
+# -------------------------
+# ws-scrcpy (WebSocket wrapper)
+# -------------------------
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
-# Download Android-x86 ISO
+# -------------------------
+# Android-x86 ISO
+# -------------------------
 RUN mkdir -p /android && \
     wget -O /android/android-x86.iso https://osdn.net/projects/android-x86/downloads/77982/android-x86_64-9.0-r2.iso/
 
-# Add entrypoint and config
+# -------------------------
+# Entrypoint + supervisor
+# -------------------------
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Expose ports
+# Expose ADB and VNC
 EXPOSE 5555 5900
 
 CMD ["/usr/bin/supervisord"]
