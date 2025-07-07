@@ -62,7 +62,7 @@ export async function runAdbShell(sessionId: string, shellCmd: string) {
   });
   
   const pod = res.items[0];
-  if (!pod?.metadata?.name) throw new Error('Pod not found');
+  if (!pod.metadata?.name) throw new Error('Pod not found');
 
   const adbCmd = ['adb', 'shell', shellCmd];
   return await execToPod(pod.metadata.name, adbCmd);
@@ -120,8 +120,11 @@ export async function pullFile(sessionId: string, podName: string, path: string)
   streams.on('data', (chunk) => stdout.push(chunk));
 
   // ✅ FIX: Dynamically retrieve container name instead of hardcoding 'android-vm'
-  const pod = await coreV1.readNamespacedPod(podName, 'default');
-  const containerName = pod.body.spec?.containers?.[0]?.name || 'android-vm';
+  const pod = await coreV1.readNamespacedPod({
+    name: podName, 
+    namespace: 'default'
+  });
+  const containerName = pod.spec?.containers?.[0]?.name || 'android-vm';
 
   await exec.exec('default', podName, containerName, ['cat', path], streams, process.stderr, null, false);
 
