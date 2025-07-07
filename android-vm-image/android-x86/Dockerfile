@@ -66,8 +66,8 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 # Android-x86 ISO
 # -------------------------
 RUN mkdir -p /android && \
-    wget -O /android/android-x86.iso https://osdn.net/projects/android-x86/downloads/77982/android-x86_64-9.0-r2.iso/
-
+     wget -O /android/android-x86.iso \
+     https://downloads.sourceforge.net/project/android-x86/Release%209.0/android-x86_64-9.0-r2.iso
 # -------------------------
 # Entrypoint + supervisor
 # -------------------------
