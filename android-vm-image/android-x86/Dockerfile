@@ -35,9 +35,13 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
 
-# Accept licenses and install required SDK packages (updated to 34.0.0)
+# Accept licenses and install required SDK packages
 RUN yes | sdkmanager --licenses && \
-    sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+    sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "platforms;android-35"
+
+# Fix aidl script syntax error (line 6 unterminated string)
+# Replace the problematic aidl script with a fixed version
+RUN sed -i '6s|.*|    --pretty \\|' /opt/android-sdk/build-tools/34.0.0/aidl
 
 # -------------------------
 # scrcpy build
