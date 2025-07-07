@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
         - name: cloud-android-api
-          image: murphyalbert/cookbooks: cloud-android-api-latest
+          image: murphyalbert/cookbooks:cloud-android-api-latest  # ✅ fixed space
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           volumeMounts:
@@ -22,13 +23,14 @@ spec:
               mountPath: /root/.kube
             - name: session-storage
               mountPath: /app/sessions
+      restartPolicy: Always
       volumes:
         - name: kubeconfig
           hostPath:
             path: /root/.kube
         - name: session-storage
           hostPath:
-            path: /var/cloud-android-api/sessions  # or any directory on your VM
+            path: /var/cloud-android-api/sessions
 ---
 apiVersion: v1
 kind: Service
@@ -41,4 +43,4 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
-      nodePort: 30060
+      nodePort: 30060  # ✅ Exposes HTTP+WS on port 30060
