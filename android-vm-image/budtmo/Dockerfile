@@ -46,5 +46,7 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 COPY start-scrcpy.sh /start-scrcpy.sh
 RUN chmod +x /start-scrcpy.sh
 
-EXPOSE 5555 8080
-CMD ["/start-scrcpy.sh"]
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+EXPOSE 5555 5900
+CMD ["/usr/bin/supervisord"]
