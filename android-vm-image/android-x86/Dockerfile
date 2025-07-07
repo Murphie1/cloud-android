@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies (Java, Gradle, build tools, media libs, VNC, QEMU, ADB, etc.)
+# Install dependencies (QEMU, Android tools, scrcpy deps, etc.)
 RUN apt-get update && apt-get install -y \
   qemu-system-x86 \
   android-sdk-platform-tools \
@@ -28,15 +28,14 @@ RUN apt-get update && apt-get install -y \
   libavfilter-dev \
   libusb-1.0-0-dev \
   libsdl2-dev \
-  openjdk-11-jdk \
+  openjdk-17-jdk \
   gradle \
   adb \
   && apt-get clean
 
-# Set JAVA_HOME dynamically
-RUN echo "export JAVA_HOME=$(readlink -f /usr/bin/java | sed 's:bin/java::')" >> /etc/profile && \
-    echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> /etc/profile && \
-    export JAVA_HOME=$(readlink -f /usr/bin/java | sed 's:bin/java::')
+# Set JAVA_HOME for Java 17
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
 # Clone and build scrcpy
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
@@ -46,22 +45,20 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     ninja -C build && \
     ninja -C build install
 
-# Clone ws-scrcpy (websocket wrapper)
+# Clone ws-scrcpy
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Download Android-x86 ISO
 RUN mkdir -p /android && \
     wget -O /android/android-x86.iso https://osdn.net/projects/android-x86/downloads/77982/android-x86_64-9.0-r2.iso/
 
-# Copy entrypoint script
+# Copy startup script and supervisor config
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
-
-# Copy supervisord config
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose ADB and VNC ports
 EXPOSE 5555 5900
 
-# Start supervisor
+# Start supervisor on container boot
 CMD ["/usr/bin/supervisord"]
