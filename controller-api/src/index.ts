@@ -1,7 +1,6 @@
 import express, { Request, Response, RequestHandler, NextFunction } from 'express';
 import { createSession } from "./sessionFactory";
 import { 
-  //createSession, 
   deleteSession, 
   getSessionStatus,
   runAdbShell,
@@ -125,17 +124,18 @@ app.get('/session/:id/screenshot', async (req, res) => {
 app.post('/session/:id/install', upload.single('apk'), asyncHandler(async (req, res) => {
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  const podName = status.podName;
 
-  if (!status.exists || !podName)
+  if (!status.exists || !status.podName)
     return res.status(404).json({ error: 'Session not found' });
 
   try {
-    if (req.body.file) {
-      const result = await installApk(sessionId, podName, req.body.container, req.body.file.path);
+    // ✅ FIX: Use req.file (from multer), not req.body.file
+    if (req.file) {
+      const container = req.body.container ?? 'android-vm'; // fallback
+      const result = await installApk(sessionId, status.podName, container, req.file.path);
       res.json(result);
     } else if (req.body.url) {
-      const result = await installApkFromUrl(sessionId, req.body.url, podName);
+      const result = await installApkFromUrl(sessionId, req.body.url, status.podName);
       res.json(result);
     } else {
       res.status(400).json({ error: 'No file or URL provided' });
@@ -146,26 +146,23 @@ app.post('/session/:id/install', upload.single('apk'), asyncHandler(async (req, 
 }));
 
 app.post('/session/:id/files/push', upload.single('file'), asyncHandler(async (req, res) => {
-  const { path, file, container } = req.body;
+  const { path, container } = req.body;
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  if (!file || !path) return res.status(400).json({ error: 'Missing file or path' });
 
-  const buf = await fs.readFile(file.path, async (err, data) => {
-  const result = await pushFile(sessionId, status.podName!, container, path, data);
+  if (!status.exists || !status.podName)
+    return res.status(404).json({ error: 'Session not found' });
+
+  if (!req.file || !path)
+    return res.status(400).json({ error: 'Missing file or path' });
+
+  // ✅ FIX: Use fs.promises.readFile for async/await
+  const buf = await fs.promises.readFile(req.file.path);
+
+  const result = await pushFile(sessionId, status.podName, container ?? 'android-vm', path, buf);
   res.json(result);
-});
 }));
 
-app.get('/session/:id/files/pull', async (req, res) => {
-  const { path } = req.query;
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  const buf = await pullFile(sessionId, status.podName!, path as string);
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.send(buf);
-});
 
 app.get('/session/:id/files/list', async (req, res) => {
   const { path } = req.query;
@@ -176,12 +173,29 @@ app.get('/session/:id/files/list', async (req, res) => {
   res.json({ output: result.stdout });
 });
 
-app.get('/session/:id/apps', async (req, res) => {
+app.get('/session/:id/files/pull', asyncHandler(async (req, res) => {
+  const { path } = req.query;
   const sessionId = req.params.id;
   const status = await getSessionStatus(sessionId);
-  const result = await listInstalledApps(sessionId, status.podName!);
+
+  if (!status.exists || !status.podName)
+    return res.status(404).json({ error: 'Session not found' });
+
+  const buf = await pullFile(sessionId, status.podName, path as string);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.send(buf);
+}));
+
+app.get('/session/:id/apps', asyncHandler(async (req, res) => {
+  const sessionId = req.params.id;
+  const status = await getSessionStatus(sessionId);
+
+  if (!status.exists || !status.podName)
+    return res.status(404).json({ error: 'Session not found' });
+
+  const result = await listInstalledApps(sessionId, status.podName);
   res.json(result);
-});
+}));
 
 app.delete('/session/:id/apps/:pkg', async (req, res) => {
   const sessionId = req.params.id;
