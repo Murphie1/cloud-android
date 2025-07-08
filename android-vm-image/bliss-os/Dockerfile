@@ -53,7 +53,7 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Replace manual COPY with auto-download
-RUN wget -O /opt/bliss.iso https://downloads.sourceforge.net/project/blissos/Android-Generic/bliss_x86_64-O-v14.3-r5.iso
+RUN wget -O /opt/bliss.iso https://sourceforge.net/projects/blissos-x86/files/latest/download?hem=7814f37ae45c5314fde09a67aee939992806c5684caed64bf739b99c7e4c890b
 
 # Final setup
 COPY start.sh /start.sh
