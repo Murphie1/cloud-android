@@ -13,13 +13,13 @@ spec:
       ports:
         - containerPort: 5555
       env:
-        - name: RENDROID_WIDTH
+        - name: REDROID_WIDTH
           value: "1080"
-        - name: RENDROID_HEIGHT
+        - name: REDROID_HEIGHT
           value: "1920"
-        - name: RENDROID_DPI
+        - name: REDROID_DPI
           value: "420"
-        - name: RENDROID_ROTATION
+        - name: REDROID_ROTATION
           value: "0"
     - name: scrcpy
       image: murphyalbert/cookbooks:redroid-scrcpy-ws-latest
