@@ -5,6 +5,10 @@ FROM redroid/redroid:16.0.0-latest
 
 #USER root
 
+RUN whoami && id && cat /etc/os-release
+
+RUN apk update
+
 # Redroid images usually come with essential Android tools (like adb).
 # However, we still need to ensure scrcpy dependencies are met.
 # Some build dependencies might be slightly different for ARM64/Alpine-based Redroid images
@@ -16,7 +20,7 @@ FROM redroid/redroid:16.0.0-latest
 # Note: Alpine uses 'apk add' and package names might differ slightly.
 # 'build-base' provides essential build tools like gcc, g++, make.
 # 'meson' and 'ninja' are usually separate packages.
-RUN apk update && apk add --no-cache \
+RUN apk add --no-cache \
   git curl unzip ffmpeg build-base meson ninja \
   sdl2-dev pkgconf libusb-dev \
   ffmpeg-dev # This combines all the libav*dev packages
