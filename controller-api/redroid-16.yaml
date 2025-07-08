@@ -1,44 +1,27 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
-  name: android-vm-{{sessionId}}
+  name: redroid-session-{{SESSION_ID}}
   labels:
-    app: redroid-16-vm
-    session: "{{sessionId}}"
+    session: {{SESSION_ID}}
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: redroid-16-vm
-      session: "{{sessionId}}"
-  template:
-    metadata:
-      labels:
-        app: redroid-16-vm
-        session: "{{sessionId}}"
-    spec:
-      containers:
-        - name: redroid-16-vm
-          image: murphyalbert/cookbooks:redroid-16-vm-latest
-          imagePullPolicy: Always
-          env:
-            - name: DISPLAY_RESOLUTION
-            value: "{{resolution}}"
-          ports:
-            - containerPort: 8080  # WebSocket for scrcpy
-            - containerPort: 5555  # ADB (internal)
-            - containerPort: 5900  # VNC (internal)
-          resources:
-            requests:
-              cpu: "{{cpuRequests}}"
-              memory: "{{memoryRequests}}"
-            limits:
-              cpu: "{{cpuLimits}}"
-              memory: "{{memoryLimits}}"
-          volumeMounts:
-            - mountPath: /data
-              name: android-data
-      volumes:
-        - name: android-data
-          emptyDir: {}
-      restartPolicy: Always
+  containers:
+    - name: redroid
+      image: redroid/redroid:16.0.0-latest
+      securityContext:
+        privileged: true
+      ports:
+        - containerPort: 5555
+      env:
+        - name: RENDROID_WIDTH
+          value: "1080"
+        - name: RENDROID_HEIGHT
+          value: "1920"
+        - name: RENDROID_DPI
+          value: "420"
+        - name: RENDROID_ROTATION
+          value: "0"
+    - name: scrcpy
+      image: murphyalbert/cookbooks:redroid-scrcpy-ws-latest
+      ports:
+        - containerPort: 8080
