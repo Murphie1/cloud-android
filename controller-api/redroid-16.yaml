@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: redroid-16-vm
-          image: murphyalbert/redroid-16-vm-latest
+          image: murphyalbert/cookbooks:redroid-16-vm-latest
           imagePullPolicy: Always
           env:
             - name: DISPLAY_RESOLUTION
