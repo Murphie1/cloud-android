@@ -19,6 +19,20 @@ RUN apt-get update && apt-get install -y \
   libxi-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /opt/android-sdk/cmdline-tools && \
+    cd /opt/android-sdk && \
+    wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip && \
+    unzip cmdline-tools.zip -d cmdline-tools && \
+    mv cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest && \
+    rm cmdline-tools.zip
+
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+
+# Only install essential packages (remove build-tools)
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools"
+
 # Install scrcpy with prebuilt server
 ARG SCRCPY_VER=3.3.1
 ARG SERVER_HASH="a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8"
