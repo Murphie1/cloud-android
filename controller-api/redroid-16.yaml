@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redroid-session-{{sessionId}}
+  name: android-vm-{{sessionId}}
   labels:
     app: redroid
     session: {{sessionId}}
