@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redroid-session-{{sessionId}}
+  labels:
+    session: {{sessionId}}
+spec:
+  containers:
+    - name: redroid
+      image: redroid/redroid:15.0.0-latest
+      securityContext:
+        privileged: true
+      ports:
+        - containerPort: 5555
+      env:
+        - name: REDROID_WIDTH
+          value: "1080"
+        - name: REDROID_HEIGHT
+          value: "1920"
+        - name: REDROID_DPI
+          value: "420"
+        - name: REDROID_ROTATION
+          value: "0"
+    - name: scrcpy
+      image: murphyalbert/cookbooks:redroid-scrcpy-ws-latest
+      ports:
+        - containerPort: 8080
