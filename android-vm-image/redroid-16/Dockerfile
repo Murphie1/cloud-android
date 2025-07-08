@@ -3,7 +3,7 @@
 # The 'aosp-arm64' tag ensures it's built for ARM64 architecture.
 FROM redroid/redroid:16.0.0-latest
 
-USER root
+#USER root
 
 # Redroid images usually come with essential Android tools (like adb).
 # However, we still need to ensure scrcpy dependencies are met.
