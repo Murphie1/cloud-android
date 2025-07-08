@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: redroid-session-{{SESSION_ID}}
+  name: redroid-session-{{sessionId}}
   labels:
-    session: {{SESSION_ID}}
+    session: {{sessionId}}
 spec:
   containers:
     - name: redroid
