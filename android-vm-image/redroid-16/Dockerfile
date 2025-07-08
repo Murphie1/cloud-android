@@ -21,14 +21,23 @@ RUN apt-get update && apt-get install -y \
 
 # Install scrcpy
 ARG SCRCPY_VER=3.3.1
-RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy --depth 1 --branch "v${SCRCPY_VER}"
-WORKDIR /opt/scrcpy
-RUN meson setup build \
-    --buildtype=release \
-    -Db_lto=true \
-    -Dstrip=true
-RUN meson compile -C build
-RUN meson install -C build
+ARG SERVER_HASH="a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8"
+
+# Download prebuilt server binary
+RUN curl -L -o /scrcpy-server \
+    https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VER}/scrcpy-server-v${SCRCPY_VER} && \
+    echo "${SERVER_HASH}  /scrcpy-server" | sha256sum -c -
+
+# Build client only with prebuilt server
+RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
+    cd /opt/scrcpy && \
+    meson setup build \
+        --buildtype release \
+        --strip \
+        -Db_lto=true \
+        -Dprebuilt_server=/scrcpy-server && \
+    meson compile -C build && \
+    meson install -C build
 
 # Install ws-scrcpy
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
