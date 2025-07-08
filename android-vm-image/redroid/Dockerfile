@@ -5,10 +5,18 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    curl git supervisor adb \
-    build-essential meson ninja-build \
-    libsdl2-dev pkg-config libusb-1.0-0-dev \
-    ffmpeg libavcodec-dev libavformat-dev libavutil-dev \
+    wget unzip curl git \
+  build-essential ninja-build meson cmake pkg-config \
+  libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev \
+  libusb-1.0-0-dev libsdl2-dev \
+  tigervnc-standalone-server xfce4 x11vnc \
+  qemu-system-x86 net-tools supervisor ffmpeg \
+  openjdk-17-jdk \
+  adb \
+  libxcursor-dev \
+  libxinerama-dev \
+  libxrandr-dev \
+  libxi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install scrcpy with prebuilt server
