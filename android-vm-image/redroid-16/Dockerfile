@@ -19,7 +19,8 @@ USER root
 RUN apk update && apk add --no-cache \
   git curl unzip ffmpeg build-base meson ninja \
   sdl2-dev pkgconf libusb-dev \
-  libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev
+  ffmpeg-dev # This combines all the libav*dev packages
+
 
 # Android SDK Tools: Redroid usually has platform-tools pre-installed or easily accessible.
 # We'll remove the extensive SDK manager download as it's often not needed.
