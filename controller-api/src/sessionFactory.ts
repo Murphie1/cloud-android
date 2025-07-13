@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import mustache from 'mustache';
 import YAML from 'js-yaml';
 import path from 'path';
-import { k8sApi } from './k8sClient';
+import { k8sApi } from './k8sClient.js';
 
 export async function createSession(
   sessionId: string,
