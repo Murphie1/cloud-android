@@ -1,5 +1,5 @@
 import express, { Request, Response, RequestHandler, NextFunction } from 'express';
-import { createSession } from "./sessionFactory";
+import { createSession } from "./sessionFactory.js";
 import { 
   deleteSession, 
   getSessionStatus,
@@ -18,10 +18,10 @@ import {
   pullFile,
   pushFile,
   listDir,
-} from './podManager';
+} from './podManager.js';
 import fs from "fs"
 import http from 'http';
-import { proxyScrcpy } from './streamProxy';
+import { proxyScrcpy } from './streamProxy.js';
 import multer from 'multer';
 
 
