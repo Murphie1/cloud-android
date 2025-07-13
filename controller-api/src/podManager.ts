@@ -4,18 +4,6 @@ import { k8sApi, exec, coreV1, execToPod } from './k8sClient.js';
 import stream from "stream"
 import { ContainerStatus } from '@kubernetes/client-node';
 
-const template = fs.readFileSync('../android-template.yaml', 'utf8');
-
-export async function createSession(sessionId: string) {
-  const filled = template.replace(/{{SESSION_ID}}/g, sessionId);
-  const deployment = YAML.parse(filled);
-
-  await k8sApi.createNamespacedDeployment({
-    namespace: 'default', 
-    body: deployment
-  });
-}
-
 export async function deleteSession(sessionId: string) {
   await k8sApi.deleteNamespacedDeployment({
     name: `android-vm-${sessionId}`,
