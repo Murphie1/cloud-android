@@ -1,7 +1,8 @@
-import { createProxyServer } from 'http-proxy';
 import http from 'http';
 import { coreV1 } from './k8sClient.js';
+import httpProxy from 'http-proxy';
 
+const { createProxyServer } = httpProxy;
 const proxy = createProxyServer({ ws: true });
 
 // ✅ Attach error handler once
