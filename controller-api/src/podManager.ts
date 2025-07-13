@@ -1,8 +1,6 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { k8sApi, exec } from './k8sClient';
-import { coreV1 } from './k8sClient';
-import { execToPod } from './k8sClient';
+import { k8sApi, exec, coreV1, execToPod } from './k8sClient.js';
 import stream from "stream"
 import { ContainerStatus } from '@kubernetes/client-node';
 
