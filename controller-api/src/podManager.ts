@@ -1,180 +1,152 @@
 import fs from 'fs';
-import YAML from 'yaml';
-import { k8sApi, exec, coreV1, execToPod } from './k8sClient.js';
-import stream from "stream"
-import { ContainerStatus } from '@kubernetes/client-node';
+import path from 'path';
+import { spawn } from 'child_process';
+import stream from "stream";
 
-export async function deleteSession(sessionId: string) {
-  await k8sApi.deleteNamespacedDeployment({
-    name: `android-vm-${sessionId}`,
-    namespace: 'default'
+const namespace = 'default';
+
+// Fast cache for session → podName
+const podCache: Record<string, string> = {};
+
+// Core helper to run kubectl
+function runKubectl(args: string[], input?: Buffer): Promise<{ stdout: string, stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('kubectl', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let stdout = '', stderr = '';
+    proc.stdout.on('data', chunk => stdout += chunk.toString());
+    proc.stderr.on('data', chunk => stderr += chunk.toString());
+
+    proc.on('close', code => {
+      if (code === 0) resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+      else reject(new Error(stderr || `kubectl ${args.join(' ')} failed`));
+    });
+
+    if (input) proc.stdin.write(input);
+    proc.stdin.end();
   });
+}
+
+// Get pod for session (cached for speed)
+async function getPodName(sessionId: string): Promise<string> {
+  if (podCache[sessionId]) return podCache[sessionId];
+
+  const { stdout } = await runKubectl([
+    'get', 'pod',
+    '-n', namespace,
+    '-l', `session=${sessionId}`,
+    '-o', 'jsonpath={.items[0].metadata.name}'
+  ]);
+
+  if (!stdout) throw new Error('No pod found for session');
+  podCache[sessionId] = stdout;
+  return stdout;
+}
+
+// === Management ===
+export async function deleteSession(sessionId: string) {
+  await runKubectl(['delete', 'deployment', `android-vm-${sessionId}`, '-n', namespace]);
+  delete podCache[sessionId];
 }
 
 export async function getSessionStatus(sessionId: string) {
-  const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod({
-    namespace: 'default', 
-    labelSelector,
-  });
+  const { stdout } = await runKubectl([
+    'get', 'pod',
+    '-n', namespace,
+    '-l', `session=${sessionId}`,
+    '-o', 'jsonpath={.items[0].status.phase}'
+  ]);
 
-  if (res.items.length === 0) {
-    return { exists: false, ready: false };
-  }
+  if (!stdout) return { exists: false, ready: false };
 
-  // ✅ FIX: Choose a running pod if multiple exist (e.g., during restarts)
-  const pod = res.items.find(p => p.status?.phase === 'Running') || res.items[0];
+  const phase = stdout;
+  const ready = phase === 'Running';
+  return { exists: true, podName: await getPodName(sessionId), phase, ready };
+}
 
-  const conditions = pod.status?.conditions || [];
-  const ready = conditions.some(c => c.type === 'Ready' && c.status === 'True');
-
-  return {
-    exists: true,
-    podName: pod.metadata?.name,
-    phase: pod.status?.phase,
-    ready
-  };
+// === ADB / Android actions ===
+async function adbExec(sessionId: string, adbArgs: string[]): Promise<string> {
+  const pod = await getPodName(sessionId);
+  const { stdout } = await runKubectl([
+    'exec', pod, '-n', namespace, '--', 'adb', ...adbArgs
+  ]);
+  return stdout;
 }
 
 export async function runAdbShell(sessionId: string, shellCmd: string) {
-  const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod({
-    namespace: 'default', 
-    pretty: undefined,
-    allowWatchBookmarks: undefined,
-    _continue: undefined,
-    fieldSelector: undefined,
-    labelSelector,
-  });
-  
-  const pod = res.items[0];
-  if (!pod.metadata?.name) throw new Error('Pod not found');
-
-  const adbCmd = ['adb', 'shell', shellCmd];
-  return await execToPod(pod.metadata.name, adbCmd);
+  return adbExec(sessionId, ['shell', shellCmd]);
 }
 
 export async function tap(sessionId: string, x: number, y: number) {
-  return await runAdbShell(sessionId, `input tap ${x} ${y}`);
+  return runAdbShell(sessionId, `input tap ${x} ${y}`);
 }
 
 export async function swipe(sessionId: string, x1: number, y1: number, x2: number, y2: number) {
-  return await runAdbShell(sessionId, `input swipe ${x1} ${y1} ${x2} ${y2}`);
+  return runAdbShell(sessionId, `input swipe ${x1} ${y1} ${x2} ${y2}`);
 }
 
 export async function keyevent(sessionId: string, code: number) {
-  return await runAdbShell(sessionId, `input keyevent ${code}`);
+  return runAdbShell(sessionId, `input keyevent ${code}`);
 }
 
-export async function screenshot(sessionId: string) {
-  const result = await runAdbShell(sessionId, `screencap -p`);
-  return result.stdout; // PNG base64 or binary (depending on handling)
+export async function screenshot(sessionId: string): Promise<Buffer> {
+  const pod = await getPodName(sessionId);
+  const { stdout } = await runKubectl(['exec', pod, '-n', namespace, '--', 'adb', 'shell', 'screencap', '-p']);
+  return Buffer.from(stdout, 'binary');
 }
 
-export async function installApk(sessionId: string, podName: string, container: string, localPath: string) {
-  const apkDest = `/data/local/tmp/uploaded.apk`;
-  const copyCmd = ['sh', '-c', `cat > ${apkDest}`];
-
-  // ✅ FIX: Use fs.promises.readFile instead of incorrect callback+await usage
+// === APK / file management ===
+export async function installApk(sessionId: string, localPath: string) {
+  const pod = await getPodName(sessionId);
+  const apkDest = '/data/local/tmp/uploaded.apk';
   const fileBuffer = await fs.promises.readFile(localPath);
-
-  // ✅ FIX: Ensure namespace and container are passed
-  await execToPod(podName, copyCmd, 'default', container, fileBuffer);
-
-  // ✅ FIX: Ensure consistent usage of execToPod with namespace and container
-  const result = await execToPod(podName, ['adb', 'install', '-r', apkDest], 'default', container);
-  return result;
+  await runKubectl(['exec', pod, '-n', namespace, '--', 'sh', '-c', `cat > ${apkDest}`], fileBuffer);
+  return adbExec(sessionId, ['install', '-r', apkDest]);
 }
 
-export async function installApkFromUrl(sessionId: string, url: string, podName: string) {
-  const cmd = [
-    'sh', '-c',
-    `wget -O /data/local/tmp/remote.apk '${url}' && adb install -r /data/local/tmp/remote.apk`
-  ];
-  return await execToPod(podName, cmd);
+export async function installApkFromUrl(sessionId: string, url: string) {
+  return runAdbShell(sessionId, `wget -O /data/local/tmp/remote.apk '${url}' && adb install -r /data/local/tmp/remote.apk`);
 }
 
-export async function pushFile(sessionId: string, podName: string, container: string, destPath: string, fileBuffer: Buffer) {
-  const cmd = ['sh', '-c', `cat > '${destPath}'`];
-  return await execToPod(podName, cmd, 'default', container, fileBuffer);
+export async function pushFile(sessionId: string, destPath: string, fileBuffer: Buffer) {
+  const pod = await getPodName(sessionId);
+  await runKubectl(['exec', pod, '-n', namespace, '--', 'sh', '-c', `cat > '${destPath}'`], fileBuffer);
 }
 
-export async function pullFile(sessionId: string, podName: string, path: string): Promise<Buffer> {
-  const stdout: Buffer[] = [];
-  const streams = new stream.PassThrough();
-
-  streams.on('data', (chunk) => stdout.push(chunk));
-
-  // ✅ FIX: Dynamically retrieve container name instead of hardcoding 'android-vm'
-  const pod = await coreV1.readNamespacedPod({
-    name: podName, 
-    namespace: 'default'
-  });
-  const containerName = pod.spec?.containers?.[0]?.name || 'android-vm';
-
-  await exec.exec('default', podName, containerName, ['cat', path], streams, process.stderr, null, false);
-
-  return Buffer.concat(stdout);
+export async function pullFile(sessionId: string, filePath: string): Promise<Buffer> {
+  const pod = await getPodName(sessionId);
+  const { stdout } = await runKubectl(['exec', pod, '-n', namespace, '--', 'cat', filePath]);
+  return Buffer.from(stdout, 'binary');
 }
 
-export async function listDir(sessionId: string, podName: string, path: string) {
-  const cmd = ['ls', '-l', path];
-  return await execToPod(podName, cmd);
+export async function listDir(sessionId: string, path: string) {
+  return runAdbShell(sessionId, `ls -l ${path}`);
 }
 
-export async function listInstalledApps(sessionId: string, podName: string) {
-  const result = await execToPod(podName, ['adb', 'shell', 'pm', 'list', 'packages', '-f']);
-
-  return result.stdout
-    .split('\n')
-    .filter(Boolean)
-    .map(line => {
-      // ✅ FIX: More robust regex to handle paths with special chars
-      const match = line.match(/^package:(.*?)=(.+)$/);
-      return match ? { apk: match[1], package: match[2] } : null;
-    })
-    .filter(Boolean);
+export async function listInstalledApps(sessionId: string) {
+  const out = await adbExec(sessionId, ['shell', 'pm', 'list', 'packages', '-f']);
+  return out.split('\n').filter(Boolean).map(line => {
+    const match = line.match(/^package:(.*?)=(.+)$/);
+    return match ? { apk: match[1], package: match[2] } : null;
+  }).filter(Boolean);
 }
 
-export async function uninstallApp(sessionId: string, podName: string, pkg: string) {
-  return await execToPod(podName, ['adb', 'uninstall', pkg]);
+export async function uninstallApp(sessionId: string, pkg: string) {
+  return adbExec(sessionId, ['uninstall', pkg]);
 }
 
-export async function startRecording(sessionId: string, podName: string) {
-  const cmd = ['adb', 'shell', 'screenrecord', '/sdcard/record.mp4'];
-  // Detach in background using sh
-  return await execToPod(podName, ['sh', '-c', `${cmd.join(' ')} &`]);
+// === Recording ===
+export async function startRecording(sessionId: string) {
+  return runAdbShell(sessionId, `screenrecord /sdcard/record.mp4 &`);
 }
 
-export async function stopRecording(sessionId: string, podName: string): Promise<Buffer> {
-  await execToPod(podName, ['adb', 'shell', 'pkill', '-INT', 'screenrecord']);
-  await new Promise(r => setTimeout(r, 1000)); // wait for write
-
-  return await pullFile(sessionId, podName, '/sdcard/record.mp4');
+export async function stopRecording(sessionId: string): Promise<Buffer> {
+  await runAdbShell(sessionId, `pkill -INT screenrecord`);
+  await new Promise(r => setTimeout(r, 1000));
+  return pullFile(sessionId, '/sdcard/record.mp4');
 }
 
-export async function switchLauncher(sessionId: string, podName: string, launcherPkg: string) {
-  // Clear default launcher
-  await execToPod(podName, ['adb', 'shell', 'pm', 'clear', 'com.android.launcher3']);
-
-  // Start the new launcher
-  const cmd = [
-    'adb', 'shell',
-    'am', 'start',
-    '-a', 'android.intent.action.MAIN',
-    '-c', 'android.intent.category.HOME',
-    '-n', `${launcherPkg}/.Launcher` // fallback: just package if exact name unknown
-  ];
-
-  const result = await execToPod(podName, cmd);
-  return result;
-}
-
-// 🆕 Optional Helper: Reusable pod name fetcher
-async function getPodNameForSession(sessionId: string): Promise<string> {
-  const labelSelector = `session=${sessionId}`;
-  const res = await coreV1.listNamespacedPod({ namespace: 'default', labelSelector });
-  const pod = res.items.find(p => p.status?.phase === 'Running') || res.items[0];
-  if (!pod?.metadata?.name) throw new Error('Pod not found for session');
-  return pod.metadata.name;
+export async function switchLauncher(sessionId: string, launcherPkg: string) {
+  await runAdbShell(sessionId, `pm clear com.android.launcher3`);
+  return runAdbShell(sessionId, `am start -a android.intent.action.MAIN -c android.intent.category.HOME -n ${launcherPkg}/.Launcher`);
 }
