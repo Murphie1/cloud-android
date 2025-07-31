@@ -1,56 +1,49 @@
-import http from 'http';
-import { spawn } from 'child_process';
-import httpProxy from 'http-proxy';
+import * as k8s from '@kubernetes/client-node';
+import { Exec } from '@kubernetes/client-node';
+import stream from 'stream';
 
-const { createProxyServer } = httpProxy;
-const proxy = createProxyServer({ ws: true });
+const kc = new k8s.KubeConfig();
+kc.loadFromDefault();
 
-// Attach error handler once
-proxy.on('error', (err, _req, _res, _target) => {
-  console.error(`❌ Proxy error: ${err.message}`);
-});
+export const exec = new Exec(kc);
+export const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
+export const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
 
-function runKubectl(args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('kubectl', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '', stderr = '';
+// Exec utility
+export async function execToPod(
+  podName: string,
+  cmd: string[],
+  namespace = 'default',
+  container = 'android-x86-vm',
+  fileBuffer?: Buffer
+): Promise<{ stdout: string, stderr: string }> {
+  const stdout = new stream.PassThrough();
+  const stderr = new stream.PassThrough();
+  const stdoutChunks: Buffer[] = [];
+  const stderrChunks: Buffer[] = [];
 
-    proc.stdout.on('data', d => stdout += d.toString());
-    proc.stderr.on('data', d => stderr += d.toString());
+  stdout.on('data', (chunk) => stdoutChunks.push(chunk));
+  stderr.on('data', (chunk) => stderrChunks.push(chunk));
 
-    proc.on('close', code => {
-      if (code === 0) resolve(stdout.trim());
-      else reject(new Error(stderr || `kubectl ${args.join(' ')} failed`));
-    });
-  });
+  await exec.exec(namespace, podName, container, cmd, stdout, stderr, null, false);
+
+  return {
+    stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+    stderr: Buffer.concat(stderrChunks).toString('utf-8'),
+  };
 }
 
-export async function proxyScrcpy(
-  req: http.IncomingMessage,
-  socket: any,
-  head: any,
-  sessionId: string
-) {
-  try {
-    // Get pod IP quickly with jsonpath
-    const ip = await runKubectl([
-      'get', 'pod',
-      '-n', 'default',
-      '-l', `session=${sessionId}`,
-      '-o', 'jsonpath={.items[0].status.podIP}'
-    ]);
-
-    if (!ip) {
-      console.warn(`❌ No running pod found for session ${sessionId}`);
-      return socket.destroy();
-    }
-
-    const target = `ws://${ip}:8080`;
-    console.log(`🔁 Proxying scrcpy for session ${sessionId} to ${target}`);
-    proxy.ws(req, socket, head, { target });
-
-  } catch (err: any) {
-    console.error(`❌ Failed to proxy scrcpy: ${err.message}`);
-    socket.destroy();
-  }
+// Lookup pod from Deployment label
+export async function getPodNameFromSession(sessionId: string): Promise<string> {
+  const res = await coreV1.listNamespacedPod({
+    namespace: 'default', 
+    pretty: undefined, 
+    allowWatchBookmarks: undefined,
+    _continue: undefined,
+    fieldSelector: undefined, 
+    labelSelector: `session=${sessionId}`
+  });
+  const pods = res.items;
+  if (!pods.length) throw new Error(`No pod found for session ${sessionId}`);
+  return pods[0].metadata?.name!;
 }
