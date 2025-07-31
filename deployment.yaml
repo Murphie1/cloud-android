@@ -12,6 +12,7 @@ spec:
       labels:
         app: cloud-android-api
     spec:
+      serviceAccountName: curl-tool-sa
       containers:
         - name: cloud-android-api
           image: murphyalbert/cookbooks:cloud-android-api-latest  # ✅ fixed space
