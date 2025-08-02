@@ -33,3 +33,4 @@ spec:
           image: murphyalbert/cookbooks:redroid-scrcpy-ws-latest
           ports:
             - containerPort: 8080
+            - containerPort: 8081
