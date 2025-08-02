@@ -7,6 +7,11 @@ RUN apt-get update && apt-get install -y \
   git curl unzip ffmpeg build-essential meson ninja-build \
   libsdl2-dev pkg-config libusb-1.0-0-dev \
   libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev
+  # NodeJS 20.x LTS
+    ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Android SDK tools if not already included
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
@@ -45,6 +50,11 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 COPY start-scrcpy.sh /start-scrcpy.sh
 RUN chmod +x /start-scrcpy.sh
+
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
+
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
