@@ -19,6 +19,11 @@ RUN apt update && apt install -y \
 
 COPY start.sh /start.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
+
 RUN chmod +x /start.sh
 
 CMD ["/usr/bin/supervisord"]
