@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all system dependencies
+# Install all system dependencies + Node.js
 RUN apt-get update && apt-get install -y \
   wget unzip curl git \
   build-essential ninja-build meson cmake pkg-config \
@@ -16,10 +16,13 @@ RUN apt-get update && apt-get install -y \
   libxinerama-dev \
   libxrandr-dev \
   libxi-dev \
+  ca-certificates \
+  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
   && apt-get clean
 
 # -------------------------
-# Android SDK Setup (simplified)
+# Android SDK Setup
 # -------------------------
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     cd /opt/android-sdk && \
@@ -31,22 +34,19 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
-# Only install essential packages (remove build-tools)
 RUN yes | sdkmanager --licenses && \
     sdkmanager "platform-tools"
 
 # -------------------------
-# scrcpy build (fixed using official method)
+# scrcpy build
 # -------------------------
 ARG SCRCPY_VER=3.3.1
 ARG SERVER_HASH="a0f70b20aa4998fbf658c94118cd6c8dab6abbb0647a3bdab344d70bc1ebcbb8"
 
-# Download prebuilt server binary
 RUN curl -L -o /scrcpy-server \
     https://github.com/Genymobile/scrcpy/releases/download/v${SCRCPY_VER}/scrcpy-server-v${SCRCPY_VER} && \
     echo "${SERVER_HASH}  /scrcpy-server" | sha256sum -c -
 
-# Build client only with prebuilt server
 RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     cd /opt/scrcpy && \
     meson setup build \
@@ -58,9 +58,16 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
     meson install -C build
 
 # -------------------------
-# ws-scrcpy (WebSocket wrapper)
+# ws-scrcpy
 # -------------------------
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
+
+# -------------------------
+# WebSocket Agent (new)
+# -------------------------
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
 
 # -------------------------
 # Android-x86 ISO
@@ -68,6 +75,7 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 RUN mkdir -p /android && \
      wget -O /android/android-x86.iso \
      https://downloads.sourceforge.net/project/android-x86/Release%209.0/android-x86_64-9.0-r2.iso
+
 # -------------------------
 # Entrypoint + supervisor
 # -------------------------
@@ -76,5 +84,5 @@ RUN chmod +x /start.sh
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-EXPOSE 5555 5900 8080
+EXPOSE 5555 5900 8080 8081
 CMD ["/usr/bin/supervisord"]
