@@ -24,6 +24,7 @@ spec:
             - containerPort: 8080
             - containerPort: 5555
             - containerPort: 5900
+            - containerPort: 8081
           volumeMounts:
             - mountPath: /data
               name: aosp-data
