@@ -25,9 +25,10 @@ spec:
             - name: DISPLAY_RESOLUTION
             value: "{{resolution}}"
           ports:
-            - containerPort: 8080  # WebSocket for scrcpy
-            - containerPort: 5555  # ADB (internal)
-            - containerPort: 5900  # VNC (internal)
+            - containerPort: 8080 
+            - containerPort: 5555
+            - containerPort: 5900
+            - containerPort: 8081 
           resources:
             requests:
               cpu: "{{cpuRequests}}"
