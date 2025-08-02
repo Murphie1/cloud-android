@@ -1,248 +1,177 @@
-import express, { Request, Response, RequestHandler, NextFunction } from 'express';
 import { createSession } from "./sessionFactory.js";
-import { 
-  deleteSession, 
-  getSessionStatus,
-  runAdbShell,
-  tap, 
-  swipe, 
-  keyevent,
-  screenshot,
-  installApk,
-  installApkFromUrl, 
-  switchLauncher,
-  listInstalledApps,
-  uninstallApp,
-  startRecording,
-  stopRecording,
-  pullFile,
-  pushFile,
-  listDir,
-} from './podManager.js';
-import fs from "fs"
 import http from 'http';
+import WebSocket, { WebSocketServer } from 'ws';
 import { proxyScrcpy } from './streamProxy.js';
-import multer from 'multer';
+import { getPodName, createSession, deleteSession } from './podManager.js';
 
+const server = http.createServer();
+const wss = new WebSocketServer({ noServer: true });
 
+// List of all supported actions (including new additions)
+const AGENT_ACTIONS = [
+  'tap', 'swipe', 'keyevent', 'screenshot', 'installApk', 'installApkFromUrl',
+  'pushFile', 'pullFile', 'listDir', 'listInstalledApps', 'uninstallApp',
+  'startRecording', 'stopRecording', 'switchLauncher', 'reboot', 'batteryLevel',
+  'longPress', 'inputText', 'startApp', 'clearAppData', 'getProp', 'networkStatus',
+  'deleteFile', 'fileInfo', 'uiDump', 'takeBugReport', 'putSetting', 'grantPermission'
+];
 
-const app = express();
-app.use(express.json());
-
-const server = http.createServer(app);
-const upload = multer({ dest: '/tmp' });
-
+// Handle WebSocket upgrade
 server.on('upgrade', async (req, socket, head) => {
   const url = new URL(req.url ?? '', `http://${req.headers.host}`);
   const match = url.pathname?.match(/^\/session\/(.+)\/scrcpy$/);
-  //const match = url.pathname?.match(/^\\/session\\/(.+)\\/scrcpy$/);
+  
   if (match) {
     const sessionId = match[1];
     await proxyScrcpy(req, socket, head, sessionId);
+  } else if (url.pathname === '/ws') {
+    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
   } else {
     socket.destroy();
   }
 });
 
-export const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>): RequestHandler =>
-    (req, res, next) =>
-        fn(req, res, next).catch(next);
-
-
-app.post('/session', async (req, res) => {
-  const { sessionId, resolution, memoryLimits, os, cpuLimits, memoryRequests, cpuRequests } = req.body;
-  await createSession(sessionId, os, resolution, memoryLimits, memoryRequests, cpuLimits, cpuRequests);
-  res.json({ sessionId });
-});
-
-app.delete('/session/:id', async (req, res) => {
-  await deleteSession(req.params.id);
-  res.sendStatus(204);
-});
-
-app.get('/session/:id/status', async (req, res) => {
-  try {
-    const status = await getSessionStatus(req.params.id);
-    res.json(status);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch session status' });
-  }
-});
-
-app.post('/session/:id/exec', asyncHandler(async (req, res) => {
-  const sessionId = req.params.id;
-  const { cmd } = req.body;
-
-  if (!cmd || typeof cmd !== 'string') {
-    return res.status(400).json({ error: 'Missing "cmd" in request body' });
-  }
-
-  try {
-    const result = await runAdbShell(sessionId, cmd);
-    res.json(result);
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-}));
-
-app.post('/session/:id/input/tap', asyncHandler(async (req, res) => {
-  const { x, y } = req.body;
-  if (typeof x !== 'number' || typeof y !== 'number')
-    return res.status(400).json({ error: 'x and y must be numbers' });
-
-  const result = await tap(req.params.id, x, y);
-  res.json(result);
-}));
-
-app.post('/session/:id/input/swipe', asyncHandler(async (req, res) => {
-  const { x1, y1, x2, y2 } = req.body;
-  const valid = [x1, y1, x2, y2].every(n => typeof n === 'number');
-  if (!valid) return res.status(400).json({ error: 'All coords must be numbers' });
-
-  const result = await swipe(req.params.id, x1, y1, x2, y2);
-  res.json(result);
-}));
-
-app.post('/session/:id/input/key', asyncHandler(async (req, res) => {
-  const { code } = req.body;
-  if (typeof code !== 'number') return res.status(400).json({ error: 'Keycode must be a number' });
-
-  const result = await keyevent(req.params.id, code);
-  res.json(result);
-}));
-
-app.get('/session/:id/screenshot', async (req, res) => {
-  const pngData = await screenshot(req.params.id);
-  const buffer = Buffer.from(pngData, 'binary');
-  res.set('Content-Type', 'image/png');
-  res.send(buffer);
-});
-
-app.post('/session/:id/install', upload.single('apk'), asyncHandler(async (req, res) => {
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  if (!status.exists || !status.podName)
-    return res.status(404).json({ error: 'Session not found' });
-
-  try {
-    // ✅ FIX: Use req.file (from multer), not req.body.file
-    if (req.file) {
-      const container = req.body.container ?? 'android-vm'; // fallback
-      const result = await installApk(sessionId, status.podName, container, req.file.path);
-      res.json(result);
-    } else if (req.body.url) {
-      const result = await installApkFromUrl(sessionId, req.body.url, status.podName);
-      res.json(result);
-    } else {
-      res.status(400).json({ error: 'No file or URL provided' });
-    }
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-}));
-
-app.post('/session/:id/files/push', upload.single('file'), asyncHandler(async (req, res) => {
-  const { path, container } = req.body;
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  if (!status.exists || !status.podName)
-    return res.status(404).json({ error: 'Session not found' });
-
-  if (!req.file || !path)
-    return res.status(400).json({ error: 'Missing file or path' });
-
-  // ✅ FIX: Use fs.promises.readFile for async/await
-  const buf = await fs.promises.readFile(req.file.path);
-
-  const result = await pushFile(sessionId, status.podName, container ?? 'android-vm', path, buf);
-  res.json(result);
-}));
-
-
-app.get('/session/:id/files/list', async (req, res) => {
-  const { path } = req.query;
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  const result = await listDir(sessionId, status.podName!, path as string);
-  res.json({ output: result.stdout });
-});
-
-app.get('/session/:id/files/pull', asyncHandler(async (req, res) => {
-  const { path } = req.query;
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  if (!status.exists || !status.podName)
-    return res.status(404).json({ error: 'Session not found' });
-
-  const buf = await pullFile(sessionId, status.podName, path as string);
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.send(buf);
-}));
-
-app.get('/session/:id/apps', asyncHandler(async (req, res) => {
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-
-  if (!status.exists || !status.podName)
-    return res.status(404).json({ error: 'Session not found' });
-
-  const result = await listInstalledApps(sessionId, status.podName);
-  res.json(result);
-}));
-
-app.delete('/session/:id/apps/:pkg', async (req, res) => {
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-  const result = await uninstallApp(sessionId, status.podName!, req.params.pkg);
-  res.json(result);
-});
-
-
-app.get('/session/:id/record/start', async (req, res) => {
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-  await startRecording(sessionId, status.podName!);
-  res.json({ started: true });
-});
-
-app.get('/session/:id/record/stop', async (req, res) => {
-  const sessionId = req.params.id;
-  const status = await getSessionStatus(sessionId);
-  const buffer = await stopRecording(sessionId, status.podName!);
-  res.setHeader('Content-Type', 'video/mp4');
-  res.send(buffer);
-});
-
-app.post('/session/:id/launcher', asyncHandler(async (req, res) => {
-  const sessionId = req.params.id;
-  const { package: launcherPkg } = req.body;
-
-  if (!launcherPkg) return res.status(400).json({ error: "Missing launcher package name" });
-
-  try {
-    const status = await getSessionStatus(sessionId);
-    const result = await switchLauncher(sessionId, status.podName!, launcherPkg);
-    res.json({ switched: true, output: result.stdout });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-}));
-
-function generateSessionId() {
-  return Math.random().toString(36).substring(2, 10);
+// Helper: Generate unique request IDs
+function generateRequestId() {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
 
-const port = process.env.PORT || 3000;
-//app.listen(port, () => {
-  //console.log(`Controller API running on http://localhost:${port}`);
-//});
-server.listen(port, () => {
-  console.log(`Controller API running at http://localhost:${port}`);
+// Helper: Connect to Pod Agent with timeout
+async function connectToPodAgent(podName) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Agent connection timeout'));
+    }, 5000);
+
+    const ws = new WebSocket(`ws://${podName}:8081`);
+    
+    ws.on('open', () => {
+      clearTimeout(timer);
+      resolve(ws);
+    });
+    
+    ws.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+// Core WebSocket Command Routing
+wss.on('connection', ws => {
+  console.log('Controller client connected');
+  const agentConnections = new Map();
+
+  ws.on('close', () => {
+    // Clean up any persistent agent connections
+    agentConnections.forEach(agentWs => agentWs.close());
+    agentConnections.clear();
+  });
+
+  ws.on('message', async message => {
+    try {
+      const data = JSON.parse(message.toString());
+      const { action, sessionId, payload = {}, requestId = generateRequestId() } = data;
+
+      if (!action) {
+        return ws.send(JSON.stringify({ 
+          requestId, 
+          status: 'error', 
+          error: 'Missing action' 
+        }));
+      }
+
+      // Session management commands
+      switch (action) {
+        case 'createSession': {
+          const id = sessionId || Math.random().toString(36).substring(2, 10);
+          await createSession(id, payload.os, payload.resolution);
+          ws.send(JSON.stringify({ 
+            requestId, 
+            action, 
+            sessionId: id, 
+            status: 'created' 
+          }));
+          return;
+        }
+        
+        case 'deleteSession': {
+          await deleteSession(sessionId);
+          // Close any persistent connection to this pod
+          if (agentConnections.has(sessionId)) {
+            agentConnections.get(sessionId).close();
+            agentConnections.delete(sessionId);
+          }
+          ws.send(JSON.stringify({ 
+            requestId, 
+            action, 
+            sessionId, 
+            status: 'deleted' 
+          }));
+          return;
+        }
+      }
+
+      // Agent commands
+      try {
+        const pod = await getPodName(sessionId);
+        let agentWs;
+        
+        // Reuse connection if persistent flag is set
+        if (payload.persistent && agentConnections.has(sessionId)) {
+          agentWs = agentConnections.get(sessionId);
+        } else {
+          agentWs = await connectToPodAgent(pod);
+          if (payload.persistent) {
+            agentConnections.set(sessionId, agentWs);
+          }
+        }
+
+        // Prepare agent message with proper structure
+        const agentMsg = JSON.stringify({
+          action,
+          args: payload,
+          requestId
+        });
+
+        // Handle agent responses
+        const responseHandler = (msg) => {
+          try {
+            const response = JSON.parse(msg.toString());
+            if (response.requestId === requestId) {
+              ws.send(JSON.stringify(response));
+              agentWs.off('message', responseHandler);
+              
+              // Close temporary connections
+              if (!payload.persistent) {
+                agentWs.close();
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing agent response:', e);
+          }
+        };
+
+        agentWs.on('message', responseHandler);
+        agentWs.send(agentMsg);
+        
+      } catch (err) {
+        ws.send(JSON.stringify({
+          requestId,
+          action,
+          status: 'error',
+          error: `Agent connection failed: ${err.message}`
+        }));
+      }
+
+    } catch (err) {
+      ws.send(JSON.stringify({
+        status: 'error',
+        error: `Processing error: ${err.message}`
+      }));
+    }
+  });
 });
+
+const port = process.env.PORT || 3000;
+server.listen(port, () => console.log(`Realtime controller running on :${port}`));
