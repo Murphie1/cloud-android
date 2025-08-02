@@ -1,4 +1,4 @@
-# Scrcpy + ws-scrcpy dedicated image
+# Scrcpy + ws-scrcpy + NodeJS agent
 FROM debian:12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -6,19 +6,24 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     wget unzip curl git \
-  build-essential ninja-build meson cmake pkg-config \
-  libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev \
-  libusb-1.0-0-dev libsdl2-dev \
-  tigervnc-standalone-server xfce4 x11vnc \
-  qemu-system-x86 net-tools supervisor ffmpeg \
-  openjdk-17-jdk \
-  adb \
-  libxcursor-dev \
-  libxinerama-dev \
-  libxrandr-dev \
-  libxi-dev \
+    build-essential ninja-build meson cmake pkg-config \
+    libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libavfilter-dev \
+    libusb-1.0-0-dev libsdl2-dev \
+    tigervnc-standalone-server xfce4 x11vnc \
+    qemu-system-x86 net-tools supervisor ffmpeg \
+    openjdk-17-jdk \
+    adb \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxrandr-dev \
+    libxi-dev \
+    # NodeJS 20.x LTS
+    ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Android SDK (platform-tools only)
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
     cd /opt/android-sdk && \
     wget https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip && \
@@ -29,9 +34,7 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 
-# Only install essential packages (remove build-tools)
-RUN yes | sdkmanager --licenses && \
-    sdkmanager "platform-tools"
+RUN yes | sdkmanager --licenses && sdkmanager "platform-tools"
 
 # Install scrcpy with prebuilt server
 ARG SCRCPY_VER=3.3.1
@@ -54,10 +57,14 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
 # Add ws-scrcpy
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
+
 # Entrypoint config
 COPY start-scrcpy.sh /start-scrcpy.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /start-scrcpy.sh
 
-EXPOSE 5555 5900 8080
+EXPOSE 5555 5900 8080 8081
 CMD ["/usr/bin/supervisord"]
