@@ -21,6 +21,11 @@ RUN apt-get update && apt-get install -y \
   libavutil-dev \
   pkg-config \
   git \
+  # NodeJS 20.x LTS
+    ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
   && apt-get clean
 
 # Install dependencies
@@ -43,6 +48,11 @@ COPY aosp.iso /opt/aosp.iso
 COPY start.sh /start.sh
 COPY start-scrcpy.sh /start-scrcpy.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
+
 
 RUN chmod +x /start.sh /start-scrcpy.sh
 
