@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y \
   libxinerama-dev \
   libxrandr-dev \
   libxi-dev \
+  # NodeJS 20.x LTS
+    ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
   && apt-get clean
 
 # -------------------------
@@ -54,6 +59,11 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # Replace manual COPY with auto-download
 RUN wget -O /opt/bliss.iso https://sourceforge.net/projects/blissos-x86/files/latest/download?hem=7814f37ae45c5314fde09a67aee939992806c5684caed64bf739b99c7e4c890b
+
+WORKDIR /opt/pod-agent
+COPY agent.js /opt/pod-agent/agent.js
+RUN npm init -y && npm install ws
+
 
 # Final setup
 COPY start.sh /start.sh
