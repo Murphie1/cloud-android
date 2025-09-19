@@ -9,13 +9,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: android-x86
-      session: "{{sessionId}}"
+      app: android-{{sessionId}}
   template:
     metadata:
       labels:
-        app: android-x86
-        session: "{{sessionId}}"
+        app: android-{{sessionId}}
     spec:
       containers:
         - name: android-x86
