@@ -38,7 +38,7 @@ async function buildServer() {
       return reply.badRequest("Values, and values.POD_ID are required");
     }
 
-    const templateName = `${template}.yaml`;
+    const templateName = `${body.template}.yaml`;
     const values = body.values;
 
     let docs;
@@ -213,7 +213,7 @@ logger.delete("/sessions/:sessionId", { preHandler: requireAuth }, async (req, r
       return reply.internalServerError(`Ingress deletion failed: ${err?.message}`);
     }
 
-    return { message: "Pod deletion requested", podId, namespace };
+    return { message: "Pod deletion requested", sessionId, namespace };
   } catch (err: any) {
     req.log.error(err);
     return reply.internalServerError(err.message);
@@ -257,7 +257,7 @@ logger.post("/sessions/:sessionId/exec", { preHandler: requireAuth }, async (req
   const sessionId = (req.params as any).sessionId;
   const { command = ["sh"], container } = (req as any).body || {}; // default: sh shell
 
-  if (!podId) return reply.badRequest("podId required");
+  if (!sessionId) return reply.badRequest("podId required");
   const ns = `default`;
   const name = `android-${sessionId}`;
 
