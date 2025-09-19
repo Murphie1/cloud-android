@@ -1,0 +1,22 @@
+{
+  "name": "Android X86 image",
+  "version": "1.0.0",
+  "description": "Fastify service to create/manage dynamic androidx86 on pods on k3s to enable a remote dev environment",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "author": "you",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^5.6.0",
+    "fastify-sensible": "^3.1.2",
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.1.6"
+  }
+}
