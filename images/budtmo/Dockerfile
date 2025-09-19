@@ -80,5 +80,5 @@ RUN npm prune --production
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-EXPOSE 5555 5900
+EXPOSE 5555 5900 8080 3000
 CMD ["/usr/bin/supervisord"]
