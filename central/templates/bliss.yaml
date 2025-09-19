@@ -2,24 +2,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: android-{{sessionId}}
+  namespace: default
   labels:
-    app: bliss
-    session: "{{sessionId}}"
+    app: android-{{sessionId}}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: bliss
-      session: "{{sessionId}}"
+      app: android-{{sessionId}}
   template:
     metadata:
       labels:
-        app: bliss
-        session: "{{sessionId}}"
+        app: android-{{sessionId}}
     spec:
       containers:
         - name: bliss
-          image: registry2.nxgn.space/bliss
+          image: registry2.nxgn.space/androidx86
           imagePullPolicy: Always
           env:
             - name: DISPLAY_RESOLUTION
@@ -44,7 +42,6 @@ spec:
       volumes:
         - name: android-data
           emptyDir: {}
-      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
