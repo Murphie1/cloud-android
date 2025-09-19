@@ -23,7 +23,7 @@ spec:
             - name: DISPLAY_RESOLUTION
               value: "{{resolution}}"
             - name: API_KEY
-              value: ""   # consider replacing with a Secret
+              value: ""
           ports:
             - containerPort: 8080
             - containerPort: 5555
