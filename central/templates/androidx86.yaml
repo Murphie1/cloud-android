@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: android-{{sessionId}}
+  namespace: default
   labels:
-    app: android-x86
-    session: "{{sessionId}}"
+    app: android-{{sessionId}}
 spec:
   replicas: 1
   selector:
@@ -23,7 +23,7 @@ spec:
             - name: DISPLAY_RESOLUTION
               value: "{{resolution}}"
             - name: API_KEY
-              value: ""
+              value: ""   # consider replacing with a Secret
           ports:
             - containerPort: 8080
             - containerPort: 5555
@@ -42,7 +42,6 @@ spec:
       volumes:
         - name: android-data
           emptyDir: {}
-      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
