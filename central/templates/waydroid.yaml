@@ -15,10 +15,14 @@ spec:
       labels:
         app: android-{{sessionId}}
     spec:
+      hostNetwork: true
+      hostPID: true
       containers:
         - name: waydroid
           image: registry2.nxgn.space/waydroid
           imagePullPolicy: Always
+          securityContext:
+            privileged: true
           env:
             - name: DISPLAY_RESOLUTION
               value: "{{resolution}}"
