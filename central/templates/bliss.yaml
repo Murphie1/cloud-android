@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: bliss
-          image: registry2.nxgn.space/androidx86
+          image: registry2.nxgn.space/blissos
           imagePullPolicy: Always
           env:
             - name: DISPLAY_RESOLUTION
