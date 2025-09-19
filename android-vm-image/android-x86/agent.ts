@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 // ---- Configuration ----
-const PORT = Number(process.env.PORT || 8081);
+const PORT = Number(process.env.PORT || 3000);
 const TEMP_DIR = path.resolve(process.env.TEMP_DIR || '.android_tmp');
 const API_KEY = process.env.API_KEY || ''; // simple auth: set API_KEY to lock down access
 const DEFAULT_TIMEOUT = 15000; // ms
