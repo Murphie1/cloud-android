@@ -60,9 +60,30 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 # Replace manual COPY with auto-download
 RUN wget -O /opt/bliss.iso https://sourceforge.net/projects/blissos-x86/files/latest/download?hem=7814f37ae45c5314fde09a67aee939992806c5684caed64bf739b99c7e4c890b
 
+# -------------------------
+# WebSocket Agent (new, TypeScript)
+# -------------------------
 WORKDIR /opt/pod-agent
-COPY agent.js /opt/pod-agent/agent.js
-RUN npm init -y && npm install ws
+
+# Copy only what we need first (for cache efficiency)
+COPY package*.json tsconfig.json /opt/pod-agent/
+
+# Install deps (including TS + Fastify)
+RUN npm install --production=false \
+    && npm install typescript ts-node @types/node --save-dev \
+    && npm install fastify @fastify/websocket ws
+
+# Copy source
+COPY server.ts /opt/pod-agent/
+
+# Build to dist/
+RUN npx tsc
+
+# Remove dev deps to slim image
+RUN npm prune --production
+
+# Default run points to built JS
+#CMD ["node", "dist/server.js"]
 
 
 # Final setup
