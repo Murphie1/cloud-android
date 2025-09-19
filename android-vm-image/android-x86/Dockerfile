@@ -63,11 +63,30 @@ RUN git clone https://github.com/Genymobile/scrcpy.git /opt/scrcpy && \
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /opt/ws-scrcpy
 
 # -------------------------
-# WebSocket Agent (new)
+# WebSocket Agent (new, TypeScript)
 # -------------------------
 WORKDIR /opt/pod-agent
-COPY agent.js /opt/pod-agent/agent.js
-RUN npm init -y && npm install ws
+
+# Copy only what we need first (for cache efficiency)
+COPY package*.json tsconfig.json /opt/pod-agent/
+
+# Install deps (including TS + Fastify)
+RUN npm install --production=false \
+    && npm install typescript ts-node @types/node --save-dev \
+    && npm install fastify @fastify/websocket ws
+
+# Copy source
+COPY agent.ts /opt/pod-agent/
+
+# Build to dist/
+RUN npx tsc
+
+# Remove dev deps to slim image
+RUN npm prune --production
+
+# Default run points to built JS
+#CMD ["node", "dist/agent.js"]
+
 
 # -------------------------
 # Android-x86 ISO
@@ -84,5 +103,5 @@ RUN chmod +x /start.sh
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-EXPOSE 5555 5900 8080 8081
+EXPOSE 5555 5900 8080 3000
 CMD ["/usr/bin/supervisord"]
