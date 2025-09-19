@@ -89,7 +89,10 @@ export async function renderTemplate(templateName: string, values: Record<string
     cpu_limit: "4",
     memory_request: "4Gi",
     memory_limit: "12Gi",
-    resolution: "1280×720"
+    resolution: "1280×720",
+    redroid_height: "1920",
+    redroid_width: "1080",
+    redroid_dpi: "420"
   };
 
   const context = clean({ ...defaults, ...values });
