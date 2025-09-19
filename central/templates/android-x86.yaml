@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: android-{{sessionId}}
+  labels:
+    app: android-x86
+    session: "{{sessionId}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: android-x86
+      session: "{{sessionId}}"
+  template:
+    metadata:
+      labels:
+        app: android-x86
+        session: "{{sessionId}}"
+    spec:
+      containers:
+        - name: android-x86
+          image: registry2.nxgn.space/androidx86
+          imagePullPolicy: Always
+          env:
+            - name: DISPLAY_RESOLUTION
+              value: "{{resolution}}"
+            - name: API_KEY
+              value: ""
+          ports:
+            - containerPort: 8080
+            - containerPort: 5555
+            - containerPort: 5900
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "{{cpu_request}}"
+              memory: "{{memory_request}}"
+            limits:
+              cpu: "{{cpu_limit}}"
+              memory: "{{memory_limit}}"
+          volumeMounts:
+            - mountPath: /data
+              name: android-data
+      volumes:
+        - name: android-data
+          emptyDir: {}
+      restartPolicy: Always
