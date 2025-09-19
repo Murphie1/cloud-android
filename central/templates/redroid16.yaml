@@ -37,7 +37,7 @@ spec:
             - name: DISPLAY_RESOLUTION
               value: "{{resolution}}"
             - name: API_KEY
-              value: ""
+              value: "GraktongLzAtoCugKYYnaHR0cDovL2NybC5jbG91ZGZsYXJlLmNvbS9vcmlnaW5fY2EuY3Js"
           ports:
             - containerPort: 8080
             - containerPort: 3000
