@@ -76,7 +76,7 @@ RUN npm install --production=false \
     && npm install fastify @fastify/websocket ws
 
 # Copy source
-COPY agent.ts /opt/pod-agent/
+COPY server.ts /opt/pod-agent/
 
 # Build to dist/
 RUN npx tsc
@@ -85,7 +85,7 @@ RUN npx tsc
 RUN npm prune --production
 
 # Default run points to built JS
-#CMD ["node", "dist/agent.js"]
+#CMD ["node", "dist/server.js"]
 
 
 # -------------------------
