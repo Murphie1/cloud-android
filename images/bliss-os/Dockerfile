@@ -91,5 +91,5 @@ COPY start.sh /start.sh
 COPY start-scrcpy.sh /start-scrcpy.sh
 RUN chmod +x /start.sh /start-scrcpy.sh
 
-EXPOSE 5555 5900 8080
+EXPOSE 5555 5900 8080 3000
 CMD ["/usr/bin/supervisord"]
