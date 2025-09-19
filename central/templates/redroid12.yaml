@@ -24,11 +24,11 @@ spec:
             - containerPort: 5555
           env:
             - name: REDROID_WIDTH
-              value: "1080"
+              value: "{{redroid_width}}"
             - name: REDROID_HEIGHT
-              value: "1920"
+              value: "{{redroid_height}}"
             - name: REDROID_DPI
-              value: "420"
+              value: "{{redroid_dpi}}"
 
         - name: scrcpy-and-controller
           image: registry2.nxgn.space/redroid
