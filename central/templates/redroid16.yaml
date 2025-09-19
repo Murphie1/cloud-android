@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: android-{{sessionId}}
+  namespace: default
+  labels:
+    app: android-{{sessionId}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: android-{{sessionId}}
+  template:
+    metadata:
+      labels:
+        app: android-{{sessionId}}
+    spec:
+      containers:
+        - name: redroid16
+          image: redroid/redroid:16.0.0-latest
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 5555
+          env:
+            - name: REDROID_WIDTH
+              value: "1080"
+            - name: REDROID_HEIGHT
+              value: "1920"
+            - name: REDROID_DPI
+              value: "420"
+
+        - name: scrcpy-and-controller
+          image: registry2.nxgn.space/redroid
+          imagePullPolicy: Always
+          env:
+            - name: DISPLAY_RESOLUTION
+              value: "{{resolution}}"
+            - name: API_KEY
+              value: ""
+          ports:
+            - containerPort: 8080
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "{{cpu_request}}"
+              memory: "{{memory_request}}"
+            limits:
+              cpu: "{{cpu_limit}}"
+              memory: "{{memory_limit}}"
+          volumeMounts:
+            - mountPath: /data
+              name: android-data
+
+      volumes:
+        - name: android-data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: android-{{sessionId}}
+  namespace: default
+spec:
+  selector:
+    app: android-{{sessionId}}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+    - name: ws-scrcpy
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: android-{{sessionId}}-ingress
+  namespace: default
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: "{{sessionId}}.nxgn.space"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: android-{{sessionId}}
+                port:
+                  number: 80
+          - path: /scrcpy
+            pathType: Prefix
+            backend:
+              service:
+                name: android-{{sessionId}}
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - "{{sessionId}}.nxgn.space"
+      secretName: default-tls
